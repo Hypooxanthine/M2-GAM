@@ -1,12 +1,12 @@
 #include <iostream>
 
-#include "Mesh.h"
+#include "TriangularMesh.h"
 #include "Assert.h"
 
 int main(int argc, char** argv)
 {
     /**
-    Mesh tetrahedron;
+    TriangularMesh tetrahedron;
 
     tetrahedron.addVertex({ 0.f, 0.f, 0.f}); // 0
     tetrahedron.addVertex({ 1.f, 0.f, 0.f}); // 1
@@ -26,7 +26,7 @@ int main(int argc, char** argv)
     */
     
     ASSERT(argc == 3);
-    Mesh m;
+    TriangularMesh m;
     m.loadOFF(argv[1]);
     size_t vertexId = std::stoull(argv[2]);
     std::cout << "Laplacien de la fonction positions pour le sommet d'indice " << vertexId << " : " << m.laplacianPosition(vertexId) << '\n';
