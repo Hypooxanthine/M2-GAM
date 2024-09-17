@@ -29,5 +29,10 @@ int main(int argc, char** argv)
     Mesh m;
     m.loadOFF(argv[1]);
     size_t vertexId = std::stoull(argv[2]);
-    std::cout << "Laplacien de la fonction positions pour le sommet d'indice " << vertexId << " : " << m.laplacian(vertexId) << '\n';
+    std::cout << "Laplacien de la fonction positions pour le sommet d'indice " << vertexId << " : " << m.laplacianPosition(vertexId) << '\n';
+
+    std::cout << "Faces autour du sommet d'indice " << vertexId << " dans le sens trigonometrique : \n";
+    m.printFacesAroundVertexCCW(vertexId);
+    m.printVertexPosition(3);
+    m.printVertexPosition(7615);
 }

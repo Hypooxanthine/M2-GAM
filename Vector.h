@@ -22,7 +22,12 @@ struct Vector3
         std::array<T, 3> data;
     };
 
-    T operator[](size_t i) const
+    T& operator[](size_t i)
+    {
+        return data[i];
+    }
+
+    const T& operator[](size_t i) const
     {
         return data[i];
     }
@@ -84,15 +89,15 @@ Vector3<T> cross(const Vector3<T>& a, const Vector3<T>& b)
 }
 
 template <typename T>
-T lenght2(const Vector3<T>& a)
+T length2(const Vector3<T>& a)
 {
     return dot(a, a);
 }
 
 template <typename T>
-T lenght(const Vector3<T>& a)
+T length(const Vector3<T>& a)
 {
-    return std::sqrt(lenght2(a));
+    return std::sqrt(length2(a));
 }
 
 template <typename T>

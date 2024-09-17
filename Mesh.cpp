@@ -29,32 +29,21 @@ size_t Mesh::addFace(size_t v0, size_t v1, size_t v2)
 
     for (uint8_t i = 0; i < 3; i++)
     {
-        std::pair<size_t, size_t> ei;
-        if (i == 0)
-            ei = { std::min(v1, v2), std::max(v1, v2) };
-        else if (i == 1)
-            ei = { std::min(v0, v2), std::max(v0, v2) };
-        else
-            ei = { std::min(v0, v1), std::max(v0, v1) };
+        size_t edgeVertex0 = (f.indices[(i + 1) % 3]);
+        size_t edgeVertex1 = (f.indices[(i + 2) % 3]);
+        // We want the smallest index first so that we never store the same edge twice
+        std::pair<size_t, size_t> ei = { std::min(edgeVertex0, edgeVertex1), std::max(edgeVertex0, edgeVertex1) };
         
         if (m_MetEdges.contains(ei))
         {
             size_t& globalFaceIndex = m_MetEdges.at(ei).first;
             size_t& localEdgeIndex = m_MetEdges.at(ei).second;
 
-            if (i == 0)
-                f.n0 = globalFaceIndex;
-            else if (i == 1)
-                f.n1 = globalFaceIndex;
-            else
-                f.n2 = globalFaceIndex;
+            f.neighbours[i] = globalFaceIndex;
 
-            if (localEdgeIndex == 0)
-                m_Faces.at(globalFaceIndex).n0 = m_Faces.size();
-            else if (localEdgeIndex == 1)
-                m_Faces.at(globalFaceIndex).n1 = m_Faces.size();
-            else
-                m_Faces.at(globalFaceIndex).n2 = m_Faces.size();
+            m_Faces.at(globalFaceIndex).neighbours[localEdgeIndex] = m_Faces.size();
+
+            m_MetEdges.erase(ei);
         }
         else
         {
@@ -114,15 +103,15 @@ size_t Mesh::oppositeFaceIndex(size_t vertexIndex, size_t faceIndex) const
     return f.neighbours[v_local];
 }
 
-Vector3f Mesh::laplacian(size_t vertexIndex) const
+Vector3d Mesh::laplacianPosition(size_t vertexIndex) const
 {
-    size_t i = vertexIndex;
+    const size_t i = vertexIndex;
 
     size_t f = firstFaceIndex(i);
     size_t f0 = f;
 
-    Vector3f laplacian = { 0.f, 0.f, 0.f };
-    float sumAreas = 0.f;
+    Vector3d laplacian = { 0.f, 0.f, 0.f };
+    double sumAreas = 0.f;
     size_t faceCount = 0;
 
     // Laplacian with cotangent formula
@@ -131,35 +120,31 @@ Vector3f Mesh::laplacian(size_t vertexIndex) const
         faceCount++;
     
         // Finding vertex j
-        size_t i_local = localVertexIndex(i, f);
-        size_t j_local = (i_local + 1) % 3;
-        size_t j = m_Faces.at(f).indices[j_local];
+        size_t i_local_CCW = localVertexIndex(i, f);
+        size_t j_local_CCW = (i_local_CCW + 1) % 3;
+        size_t j = globalVertexIndex(j_local_CCW, f);
 
-        Vector3f ij = m_Vertices.at(j).position - m_Vertices.at(i).position;
+        Vector3d ij = m_Vertices.at(j).position - m_Vertices.at(i).position;
         
         size_t leftFaceIndex = CWFaceIndex(i, f);
-        size_t rightFaceIndex = f;
+        size_t& rightFaceIndex = f;
 
-        size_t cwVertexIndex_local = (localVertexIndex(leftFaceIndex, i) + 1) % 3;
-        size_t cwVertexIndex = m_Faces.at(leftFaceIndex).indices[cwVertexIndex_local];
+        size_t cwVertexIndex_local = (localVertexIndex(i, leftFaceIndex) + 1) % 3;
+        size_t cwVertexIndex = globalVertexIndex(cwVertexIndex_local, leftFaceIndex);
 
-        size_t ccwVertexIndex_local = (localVertexIndex(rightFaceIndex, i) + 2) % 3;
-        size_t ccwVertexIndex = m_Faces.at(rightFaceIndex).indices[ccwVertexIndex_local];
+        size_t ccwVertexIndex_local = (j_local_CCW + 1) % 3;
+        size_t ccwVertexIndex = globalVertexIndex(ccwVertexIndex_local, rightFaceIndex);
 
-        Vector3f cw_to_i_normalized = normalized(m_Vertices.at(i).position - m_Vertices.at(cwVertexIndex).position);
-        Vector3f cw_to_j_normalized = normalized(m_Vertices.at(j).position - m_Vertices.at(cwVertexIndex).position);
-        float cos_alpha = dot(cw_to_i_normalized, cw_to_j_normalized);
-        float sin_alpha = sqrt(1 - cos_alpha * cos_alpha);
-        float cot_alpha = cos_alpha / sin_alpha;
+        Vector3d cw_to_i = m_Vertices.at(i).position - m_Vertices.at(cwVertexIndex).position;
+        Vector3d cw_to_j = m_Vertices.at(j).position - m_Vertices.at(cwVertexIndex).position;
+        double cot_alpha = dot(cw_to_i, cw_to_j) / length(cross(cw_to_i, cw_to_j));
 
-        Vector3f ccw_to_i_normalized = normalized(m_Vertices.at(i).position - m_Vertices.at(ccwVertexIndex).position);
-        Vector3f ccw_to_j_normalized = normalized(m_Vertices.at(j).position - m_Vertices.at(ccwVertexIndex).position);
-        float cos_beta = dot(ccw_to_i_normalized, ccw_to_j_normalized);
-        float sin_beta = lenght(normalized(cross(ij, m_Vertices.at(ccwVertexIndex).position - m_Vertices.at(j).position)));
-        float cot_beta = cos_beta / sin_beta;
+        Vector3d ccw_to_i = m_Vertices.at(i).position - m_Vertices.at(ccwVertexIndex).position;
+        Vector3d ccw_to_j = m_Vertices.at(j).position - m_Vertices.at(ccwVertexIndex).position;
+        double cot_beta = dot(ccw_to_i, ccw_to_j) / length(cross(ccw_to_i, ccw_to_j));
 
         laplacian = laplacian + (cot_alpha + cot_beta) * ij;
-        sumAreas += (1.f / 3.f) * 0.5f * lenght(cross(ij, m_Vertices.at(ccwVertexIndex).position - m_Vertices.at(j).position));
+        sumAreas += length(cross(ccw_to_i, ccw_to_j)) / 2.f;
 
         size_t nextFace = CCWFaceIndex(i, f);
         if (nextFace == f0)
@@ -167,12 +152,23 @@ Vector3f Mesh::laplacian(size_t vertexIndex) const
         f = nextFace;
     }
 
-    laplacian = laplacian / (2.f * sumAreas);
-
-    std::cout << "Face count : " << faceCount << '\n';
-    std::cout << "sumAreas : " << sumAreas << '\n';
+    laplacian = laplacian / (2.f * sumAreas / 3.f);
 
     return laplacian;
+}
+
+void Mesh::printVertexPosition(size_t vertexIndex) const
+{
+    const auto& v = m_Vertices.at(vertexIndex);
+
+    std::cout << vertexIndex << ": " << v.position << '\n';
+}
+
+void Mesh::printFace(size_t faceIndex) const
+{
+    const auto& f = m_Faces.at(faceIndex);
+
+    std::cout << faceIndex << " " << f.i0 << " " << f.i1 << " " << f.i2 << " " << f.n0 << " " << f.n1 << " " << f.n2 << '\n';
 }
 
 void Mesh::printFaces() const
@@ -183,6 +179,38 @@ void Mesh::printFaces() const
         const auto& f = m_Faces.at(i);
 
         std::cout << i << " " << f.i0 << " " << f.i1 << " " << f.i2 << " " << f.n0 << " " << f.n1 << " " << f.n2 << '\n';
+    }
+}
+
+void Mesh::printFacesAroundVertexCCW(size_t vertexIndex) const
+{
+    size_t f = firstFaceIndex(vertexIndex);
+    size_t f0 = f;
+
+    for (;;)
+    {
+        printFace(f);
+
+        size_t nextFace = CCWFaceIndex(vertexIndex, f);
+        if (nextFace == f0)
+            break;
+        f = nextFace;
+    }
+}
+
+void Mesh::printFacesAroundVertexCW(size_t vertexIndex) const
+{
+    size_t f = firstFaceIndex(vertexIndex);
+    size_t f0 = f;
+
+    for (;;)
+    {
+        printFace(f);
+
+        size_t nextFace = CWFaceIndex(vertexIndex, f);
+        if (nextFace == f0)
+            break;
+        f = nextFace;
     }
 }
 

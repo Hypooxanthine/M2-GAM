@@ -25,7 +25,7 @@ public:
 
     struct Vertex
     {
-        Vector3f position;
+        Vector3d position;
         size_t faceIndex;
     };
 
@@ -62,9 +62,17 @@ public:
 
     inline size_t oppositeFaceIndex(size_t vertexIndex, size_t faceIndex) const;
 
-    Vector3f laplacian(size_t vertexIndex) const;
+    Vector3d laplacianPosition(size_t vertexIndex) const;
+
+    void printVertexPosition(size_t vertexIndex) const;
+
+    void printFace(size_t faceIndex) const;
 
     void printFaces() const;
+
+    void printFacesAroundVertexCCW(size_t vertexIndex) const;
+
+    void printFacesAroundVertexCW(size_t vertexIndex) const;
 
     void integrityTest() const;
 
