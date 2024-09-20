@@ -1,4 +1,67 @@
-build/
-build/**
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Visual studio files
+.vs/
+.vs/*
+*.hint
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+
+# Visual studio code files
 .vscode/
-.vcode/**
+.vscode/*
+
+# Output folders
+out/
+out/*
+build/
+build/*
+VisualStudio/
+VisualStudio/*
+
+# Testing temporary folders
+Testing/
+Testing/*
+
+# Docs
+docs/
+docs/*
+
+# Exceptions
+!dependencies/
+!dependencies/**
+!Resources/**
+!TP/Resources/**
