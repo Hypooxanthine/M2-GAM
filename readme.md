@@ -1,4 +1,4 @@
-# TP de Modélisation Géométrique
+# TP de Maillages et geometrie algorithmique
 
 ## Building project
 
