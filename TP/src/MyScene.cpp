@@ -126,5 +126,7 @@ void MyScene::onImGui()
 
     ImGui::Begin("Stats");
         ImGui::TextWrapped("FPS: %.2f", ImGui::GetIO().Framerate);
+        ImGui::TextWrapped("Rendered vertices: %lu", m_MeshAsset.getSubMeshes().front().meshData.getVertexCount());
+        ImGui::TextWrapped("Rendered triangles: %lu", m_MeshAsset.getSubMeshes().front().meshData.getTriangleCount());
     ImGui::End();
 }
