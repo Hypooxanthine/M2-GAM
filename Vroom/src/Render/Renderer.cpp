@@ -54,9 +54,9 @@ Renderer::Renderer()
     m_LightRegistry.setBindingPoint(0);
     m_ClusteredLights.setBindingPoint(1);
 
-    //GLCall(glEnable(GL_CULL_FACE));
-    //GLCall(glCullFace(GL_BACK));
-    //GLCall(glFrontFace(GL_CCW));
+    GLCall(glEnable(GL_CULL_FACE));
+    GLCall(glCullFace(GL_BACK));
+    GLCall(glFrontFace(GL_CCW));
 }
 
 Renderer::~Renderer()

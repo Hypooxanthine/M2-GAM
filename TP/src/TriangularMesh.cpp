@@ -148,16 +148,17 @@ glm::vec3 TriangularMesh::laplacianPosition(size_t vertexIndex) const
         laplacian = laplacian + (cot_alpha + cot_beta) * ij;
         sumAreas += length(cross(ccw_to_i, ccw_to_j)) / 2.f;
 
-        size_t nextFace = CCWFaceIndex(i, f);
-        if (nextFace == f0)
+        f = CCWFaceIndex(i, f);
+        if (f == f0)
             break;
-        f = nextFace;
     }
 
     laplacian = laplacian / (2.f * sumAreas / 3.f);
 
     return laplacian;
 }
+
+
 
 void TriangularMesh::printVertexPosition(size_t vertexIndex) const
 {
@@ -349,6 +350,56 @@ vrm::MeshData TriangularMesh::toMeshData() const
         A.normal = normal;
         B.normal = normal;
         C.normal = normal;
+
+        const size_t indexOffset = vertices.size();
+
+        vertices.push_back(A);
+        vertices.push_back(B);
+        vertices.push_back(C);
+
+        indices.push_back(indexOffset + 0);
+        indices.push_back(indexOffset + 1);
+        indices.push_back(indexOffset + 2);
+    }
+
+    return vrm::MeshData{ std::move(vertices), std::move(indices) };
+}
+
+vrm::MeshData TriangularMesh::toSmoothMeshData() const
+{
+    std::vector<vrm::Vertex> vertices;
+    std::vector<uint32_t> indices;
+
+    const size_t triangleCount = m_Faces.size();
+
+    vertices.reserve(triangleCount * 3);
+    indices.reserve(triangleCount * 3);
+
+    for (const auto& f : m_Faces)
+    {
+        vrm::Vertex A, B, C;
+        A.position = m_Vertices.at(f.i0).position;
+        B.position = m_Vertices.at(f.i1).position;
+        C.position = m_Vertices.at(f.i2).position;
+
+        A.texCoords = { 0.f, 0.f };
+        B.texCoords = { 0.f, 0.f };
+        C.texCoords = { 0.f, 0.f };
+
+        const glm::vec3 AB = B.position - A.position;
+        const glm::vec3 AC = C.position - A.position;
+        const glm::vec3 flatNormal = glm::normalize(glm::cross(AB, AC));
+
+        A.normal = glm::normalize(laplacianPosition(f.i0));
+        B.normal = glm::normalize(laplacianPosition(f.i1));
+        C.normal = glm::normalize(laplacianPosition(f.i2));
+
+        if (glm::dot(A.normal, flatNormal) < 0.f)
+            A.normal = -A.normal;
+        if (glm::dot(B.normal, flatNormal) < 0.f)
+            B.normal = -B.normal;
+        if (glm::dot(C.normal, flatNormal) < 0.f)
+            C.normal = -C.normal;
 
         const size_t indexOffset = vertices.size();
 

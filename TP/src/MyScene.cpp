@@ -63,7 +63,7 @@ void MyScene::onInit()
     /* Processing */
 
     m_TriangularMesh.loadOFF("Resources/OffFiles/queen.off");
-    m_MeshAsset.addSubmesh(m_TriangularMesh.toMeshData());
+    m_MeshAsset.addSubmesh(m_TriangularMesh.toSmoothMeshData());
 
     /* Visualization */
 

@@ -5,6 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <functional>
 
 #include <glm/glm.hpp>
 
@@ -83,6 +84,8 @@ public:
     void saveOFF(const std::string& path) const;
 
     vrm::MeshData toMeshData() const;
+
+    vrm::MeshData toSmoothMeshData() const;
 
 private:
     std::vector<Vertex> m_Vertices;
