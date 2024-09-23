@@ -55,6 +55,8 @@ private:
 	std::string m_ViewMode = "Flat";
 	float m_LastComputeTimeSeconds = 0.f;
 
-	size_t m_VertexHeatSource = 10;
+	bool m_SimulationStarted = false;
+	int m_TriangleHeatSource = 10;
 	float m_HeatSourceValue = 10.f;
+	int m_IterationsPerFrame = 1;
 };

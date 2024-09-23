@@ -98,7 +98,7 @@ void MyScene::onUpdate(float dt)
 
     /* Heat diffusion simulation */
 
-    if (m_ViewMode == "Heat diffusion")
+    if (m_ViewMode == "Heat diffusion" && m_SimulationStarted)
         updateHeatDiffusion(dt);
 
 }
@@ -128,34 +128,53 @@ void MyScene::onImGui()
     ImGui::End();
 
     ImGui::Begin("Tweaks");
-    if (ImGui::BeginCombo("View mode", m_ViewMode.c_str()))
-    {
-        if (ImGui::Selectable("Flat"))
+        if (ImGui::BeginCombo("View mode", m_ViewMode.c_str()))
         {
-            m_ViewMode = "Flat";
-            showFlat();
-        }
+            if (ImGui::Selectable("Flat"))
+            {
+                m_ViewMode = "Flat";
+                showFlat();
+            }
 
-        if (ImGui::Selectable("Laplacian smooth"))
-        {
-            m_ViewMode = "Laplacian smooth";
-            showLaplacianSmooth();
-        }
-        
-        if (ImGui::Selectable("Mean curvature"))
-        {
-            m_ViewMode = "Mean curvature";
-            showCurvature();
-        }
-        
-        if (ImGui::Selectable("Heat diffusion"))
-        {
-            m_ViewMode = "Heat diffusion";
-            showHeatDiffusion();
-        }
+            if (ImGui::Selectable("Laplacian smooth"))
+            {
+                m_ViewMode = "Laplacian smooth";
+                showLaplacianSmooth();
+            }
+            
+            if (ImGui::Selectable("Mean curvature"))
+            {
+                m_ViewMode = "Mean curvature";
+                showCurvature();
+            }
+            
+            if (ImGui::Selectable("Heat diffusion"))
+            {
+                m_ViewMode = "Heat diffusion";
+            }
 
-        ImGui::EndCombo();
-    }
+            ImGui::EndCombo();
+        }
+        if (m_ViewMode == "Heat diffusion")
+        {
+            ImGui::TextWrapped("Heat source triangle");
+            ImGui::SliderInt("##Heat source triangle", &m_TriangleHeatSource, 0, static_cast<int>(m_TriangularMesh.getVertexCount() - 1));
+            ImGui::TextWrapped("Heat source value");
+            ImGui::SliderFloat("##Heat source value", &m_HeatSourceValue, 0.f, 100.f, "%.0f", ImGuiSliderFlags_Logarithmic);
+            ImGui::TextWrapped("Iterations per frame");
+            ImGui::SliderInt("##Iterations per frame", &m_IterationsPerFrame, 1, 50);
+            
+            if (m_SimulationStarted)
+            {
+                if (ImGui::Button("Stop simulation"))
+                    m_SimulationStarted = false;
+            }
+            else
+            {
+                if (ImGui::Button("Start simulation"))
+                    showHeatDiffusion();
+            }
+        }
     ImGui::End();
 
     ImGui::Begin("Stats");
@@ -235,9 +254,11 @@ void MyScene::showHeatDiffusion()
 
     for (glm::length_t i = 0; i < 3; i++)
     {
-        auto vertexIndex = m_TriangularMesh.getFace(0).indices[i];
+        auto vertexIndex = m_TriangularMesh.getFace(static_cast<size_t>(m_TriangleHeatSource)).indices[i];
         m_SmoothMeshData.getVertices().at(vertexIndex).scalar = m_HeatSourceValue;
     }
+
+    m_SimulationStarted = true;
 }
 
 void MyScene::updateHeatDiffusion(float dt)
@@ -248,13 +269,15 @@ void MyScene::updateHeatDiffusion(float dt)
         return m_SmoothMeshData.getVertices().at(vertexIndex).scalar;
     };
 
-    
-    m_SmoothMeshData = std::move(m_TriangularMesh.toHeatMeshData(heatFunction, 0.0000001f));
-
-    for (glm::length_t i = 0; i < 3; i++)
+    for (size_t i = 0; i < static_cast<size_t>(m_IterationsPerFrame); i++)
     {
-        auto vertexIndex = m_TriangularMesh.getFace(0).indices[i];
-        m_SmoothMeshData.getVertices().at(vertexIndex).scalar = m_HeatSourceValue;
+        m_SmoothMeshData = std::move(m_TriangularMesh.toHeatMeshData(heatFunction, 0.0000001f));
+
+        for (glm::length_t i = 0; i < 3; i++)
+        {
+            auto vertexIndex = m_TriangularMesh.getFace(static_cast<size_t>(m_TriangleHeatSource)).indices[i];
+            m_SmoothMeshData.getVertices().at(vertexIndex).scalar = m_HeatSourceValue;
+        }
     }
     
     // Updating the mesh

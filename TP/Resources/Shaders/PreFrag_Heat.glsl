@@ -12,7 +12,7 @@ in float v_Heat;
 // Default phong values
 void PreFrag(out vec3 ambient, out vec3 diffuse, out vec3 specular, out float shininess)
 {
-    float normalizedHeat = v_Heat / 10.0;
+    float normalizedHeat = v_Heat / 50.0;
     normalizedHeat = clamp(normalizedHeat, 0.0, 1.0);
     ambient = vec3(normalizedHeat, 0, 1 - normalizedHeat);
     diffuse = vec3(0);
