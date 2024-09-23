@@ -29,7 +29,7 @@ size_t TriangularMesh::addFace(size_t v0, size_t v1, size_t v2)
     m_Vertices.at(v1).faceIndex = m_Faces.size();
     m_Vertices.at(v2).faceIndex = m_Faces.size();
 
-    for (uint8_t i = 0; i < 3; i++)
+    for (glm::length_t i = 0; i < 3; i++)
     {
         size_t edgeVertex0 = (f.indices[(i + 1) % 3]);
         size_t edgeVertex1 = (f.indices[(i + 2) % 3]);
@@ -39,7 +39,7 @@ size_t TriangularMesh::addFace(size_t v0, size_t v1, size_t v2)
         if (m_MetEdges.contains(ei))
         {
             size_t& globalFaceIndex = m_MetEdges.at(ei).first;
-            size_t& localEdgeIndex = m_MetEdges.at(ei).second;
+            glm::length_t& localEdgeIndex = m_MetEdges.at(ei).second;
 
             f.neighbours[i] = globalFaceIndex;
 
@@ -49,7 +49,7 @@ size_t TriangularMesh::addFace(size_t v0, size_t v1, size_t v2)
         }
         else
         {
-            m_MetEdges[ei] = std::pair<size_t, size_t>{ m_Faces.size(), i };
+            m_MetEdges[ei] = std::pair<size_t, glm::length_t>{ m_Faces.size(), i };
         }
     }
 
@@ -58,7 +58,7 @@ size_t TriangularMesh::addFace(size_t v0, size_t v1, size_t v2)
     return m_Faces.size() - 1;
 }
 
-size_t TriangularMesh::localVertexIndex(size_t globalVertexIndex, size_t faceIndex) const
+glm::length_t TriangularMesh::localVertexIndex(size_t globalVertexIndex, size_t faceIndex) const
 {
     const auto& f = m_Faces.at(faceIndex);
     if (f.i0 == globalVertexIndex)
@@ -71,7 +71,7 @@ size_t TriangularMesh::localVertexIndex(size_t globalVertexIndex, size_t faceInd
     return -1;
 }
 
-size_t TriangularMesh::globalVertexIndex(size_t localVertexIndex, size_t faceIndex) const
+size_t TriangularMesh::globalVertexIndex(glm::length_t localVertexIndex, size_t faceIndex) const
 {
     return m_Faces.at(faceIndex).indices[localVertexIndex];
 }
@@ -100,65 +100,10 @@ size_t TriangularMesh::CWFaceIndex(size_t vertexIndex, size_t faceIndex) const
 size_t TriangularMesh::oppositeFaceIndex(size_t vertexIndex, size_t faceIndex) const
 {
     const auto& f = m_Faces.at(faceIndex);
-    size_t v_local = localVertexIndex(vertexIndex, faceIndex);
+    glm::length_t v_local = localVertexIndex(vertexIndex, faceIndex);
 
     return f.neighbours[v_local];
 }
-
-glm::vec3 TriangularMesh::laplacianPosition(size_t vertexIndex) const
-{
-    const size_t i = vertexIndex;
-
-    size_t f = firstFaceIndex(i);
-    size_t f0 = f;
-
-    glm::vec3 laplacian = { 0.f, 0.f, 0.f };
-    float sumAreas = 0.f;
-    size_t faceCount = 0;
-
-    // Laplacian with cotangent formula
-    for (;;)
-    {
-        faceCount++;
-    
-        // Finding vertex j
-        size_t i_local_CCW = localVertexIndex(i, f);
-        size_t j_local_CCW = (i_local_CCW + 1) % 3;
-        size_t j = globalVertexIndex(j_local_CCW, f);
-
-        glm::vec3 ij = m_Vertices.at(j).position - m_Vertices.at(i).position;
-        
-        size_t leftFaceIndex = CWFaceIndex(i, f);
-        size_t& rightFaceIndex = f;
-
-        size_t cwVertexIndex_local = (localVertexIndex(i, leftFaceIndex) + 1) % 3;
-        size_t cwVertexIndex = globalVertexIndex(cwVertexIndex_local, leftFaceIndex);
-
-        size_t ccwVertexIndex_local = (j_local_CCW + 1) % 3;
-        size_t ccwVertexIndex = globalVertexIndex(ccwVertexIndex_local, rightFaceIndex);
-
-        glm::vec3 cw_to_i = m_Vertices.at(i).position - m_Vertices.at(cwVertexIndex).position;
-        glm::vec3 cw_to_j = m_Vertices.at(j).position - m_Vertices.at(cwVertexIndex).position;
-        float cot_alpha = dot(cw_to_i, cw_to_j) / length(cross(cw_to_i, cw_to_j));
-
-        glm::vec3 ccw_to_i = m_Vertices.at(i).position - m_Vertices.at(ccwVertexIndex).position;
-        glm::vec3 ccw_to_j = m_Vertices.at(j).position - m_Vertices.at(ccwVertexIndex).position;
-        float cot_beta = dot(ccw_to_i, ccw_to_j) / length(cross(ccw_to_i, ccw_to_j));
-
-        laplacian = laplacian + (cot_alpha + cot_beta) * ij;
-        sumAreas += length(cross(ccw_to_i, ccw_to_j)) / 2.f;
-
-        f = CCWFaceIndex(i, f);
-        if (f == f0)
-            break;
-    }
-
-    laplacian = laplacian / (2.f * sumAreas / 3.f);
-
-    return laplacian;
-}
-
-
 
 void TriangularMesh::printVertexPosition(size_t vertexIndex) const
 {
@@ -351,7 +296,7 @@ vrm::MeshData TriangularMesh::toMeshData() const
         B.normal = normal;
         C.normal = normal;
 
-        const size_t indexOffset = vertices.size();
+        const uint32_t indexOffset = static_cast<uint32_t>(vertices.size());
 
         vertices.push_back(A);
         vertices.push_back(B);
@@ -390,9 +335,12 @@ vrm::MeshData TriangularMesh::toSmoothMeshData() const
         const glm::vec3 AC = C.position - A.position;
         const glm::vec3 flatNormal = glm::normalize(glm::cross(AB, AC));
 
-        A.normal = glm::normalize(laplacianPosition(f.i0));
-        B.normal = glm::normalize(laplacianPosition(f.i1));
-        C.normal = glm::normalize(laplacianPosition(f.i2));
+        auto positionFunction = [this](size_t i) -> glm::vec3 { return m_Vertices.at(i).position; };
+
+        // Rresults are visualy better if we normalize normals in the fragment shader only. I don't know why.
+        A.normal = laplacian(f.i0, positionFunction);
+        B.normal = laplacian(f.i1, positionFunction);
+        C.normal = laplacian(f.i2, positionFunction);
 
         if (glm::dot(A.normal, flatNormal) < 0.f)
             A.normal = -A.normal;
@@ -401,7 +349,7 @@ vrm::MeshData TriangularMesh::toSmoothMeshData() const
         if (glm::dot(C.normal, flatNormal) < 0.f)
             C.normal = -C.normal;
 
-        const size_t indexOffset = vertices.size();
+        const uint32_t indexOffset = static_cast<uint32_t>(vertices.size());
 
         vertices.push_back(A);
         vertices.push_back(B);
