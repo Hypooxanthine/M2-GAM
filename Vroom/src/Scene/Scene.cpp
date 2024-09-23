@@ -76,7 +76,7 @@ void Scene::render()
         const auto& meshComponent = viewMeshes.get<MeshComponent>(entity);
         const auto& transformComponent = viewMeshes.get<TransformComponent>(entity);
 
-        renderer.submitMesh(meshComponent.getMesh(), transformComponent.getTransform());
+        renderer.submitMesh(meshComponent, transformComponent.getTransform());
     }
 
     onRender();

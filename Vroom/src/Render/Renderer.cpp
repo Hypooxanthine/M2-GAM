@@ -22,6 +22,7 @@
 #include "Vroom/Asset/StaticAsset/MeshAsset.h"
 
 #include "Vroom/Scene/Components/PointLightComponent.h"
+#include "Vroom/Scene/Components/MeshComponent.h"
 
 #include "Vroom/Scene/Scene.h"
 
@@ -105,7 +106,7 @@ void Renderer::endScene(const FrameBuffer& target)
     // Drawing meshes
     for (const auto& mesh : m_Meshes)
     {
-        drawMesh(mesh.mesh, mesh.model);
+        drawMesh(mesh);
     }
 
     // Clearing data for next frame
@@ -113,7 +114,7 @@ void Renderer::endScene(const FrameBuffer& target)
     m_Meshes.clear();
 }
 
-void Renderer::submitMesh(const MeshInstance& mesh, const glm::mat4& model)
+void Renderer::submitMesh(const MeshComponent& mesh, const glm::mat4& model)
 {
     m_Meshes.push_back({ mesh, model });
 }
@@ -123,25 +124,26 @@ void Renderer::submitPointLight(const glm::vec3& position, const PointLightCompo
     m_LightRegistry.submitPointLight(pointLight, position, identifier);
 }
 
-void Renderer::drawMesh(const MeshInstance& mesh, const glm::mat4& model) const
+void Renderer::drawMesh(const QueuedMesh& mesh) const
 {
     VRM_DEBUG_ASSERT_MSG(m_Camera, "No camera set for rendering. Did you call beginScene?");
 
-    const auto& subMeshes = mesh.getStaticAsset()->getSubMeshes();
-
     const auto cameraPos = m_Camera->getPosition();
 
-    for (const auto& subMesh : subMeshes)
+    for (size_t i = 0; i < mesh.meshComponent.getSubMeshCount(); i++)
     {
-        // Binding data
-        subMesh.renderMesh.getVertexArray().bind();
-        subMesh.renderMesh.getIndexBuffer().bind();
+        const auto& subMeshRenderMesh = mesh.meshComponent.getRenderMesh(i);
+        const auto& subMeshMaterial = mesh.meshComponent.getMaterial(i);
 
-        const Shader& shader = subMesh.materialInstance.getStaticAsset()->getShader();
+        // Binding data
+        subMeshRenderMesh.getVertexArray().bind();
+        subMeshRenderMesh.getIndexBuffer().bind();
+
+        const Shader& shader = subMeshMaterial.getStaticAsset()->getShader();
         shader.bind();
 
         // Setting uniforms
-        shader.setUniformMat4f("u_Model", model);
+        shader.setUniformMat4f("u_Model", mesh.model);
         shader.setUniformMat4f("u_View", m_Camera->getView());
         shader.setUniformMat4f("u_Projection", m_Camera->getProjection());
         shader.setUniformMat4f("u_ViewProjection", m_Camera->getViewProjection());
@@ -151,13 +153,13 @@ void Renderer::drawMesh(const MeshInstance& mesh, const glm::mat4& model) const
         shader.setUniform2ui("u_ViewportSize", m_ViewportSize.x, m_ViewportSize.y);
 
         // Setting material textures uniforms
-        size_t textureCount = subMesh.materialInstance.getStaticAsset()->getTextureCount();
+        size_t textureCount = subMeshMaterial.getStaticAsset()->getTextureCount();
         if (textureCount > 0)
         {
             std::vector<int> textureSlots(textureCount);
             for (size_t i = 0; i < textureCount; ++i)
             {
-                const auto& texture = subMesh.materialInstance.getStaticAsset()->getTexture(i);
+                const auto& texture = subMeshMaterial.getStaticAsset()->getTexture(i);
                 texture.getStaticAsset()->getGPUTexture().bind((unsigned int)i);
                 textureSlots[i] = (int)i;
             }
@@ -166,7 +168,7 @@ void Renderer::drawMesh(const MeshInstance& mesh, const glm::mat4& model) const
         }
 
         // Drawing data
-        GLCall(glDrawElements(GL_TRIANGLES, (GLsizei)subMesh.renderMesh.getIndexBuffer().getCount(), GL_UNSIGNED_INT, nullptr));
+        GLCall(glDrawElements(GL_TRIANGLES, (GLsizei)subMeshRenderMesh.getIndexBuffer().getCount(), GL_UNSIGNED_INT, nullptr));
     }
 
 }

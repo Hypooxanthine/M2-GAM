@@ -58,6 +58,16 @@ size_t TriangularMesh::addFace(size_t v0, size_t v1, size_t v2)
     return m_Faces.size() - 1;
 }
 
+size_t TriangularMesh::getVertexCount() const
+{
+    return m_Vertices.size();
+}
+
+size_t TriangularMesh::getFaceCount() const
+{
+    return m_Faces.size();
+}
+
 glm::length_t TriangularMesh::localVertexIndex(size_t globalVertexIndex, size_t faceIndex) const
 {
     const auto& f = m_Faces.at(faceIndex);
@@ -315,49 +325,35 @@ vrm::MeshData TriangularMesh::toSmoothMeshData() const
     std::vector<vrm::Vertex> vertices;
     std::vector<uint32_t> indices;
 
-    const size_t triangleCount = m_Faces.size();
+    vertices.reserve(getVertexCount());
+    indices.reserve(getFaceCount() * 3);
 
-    vertices.reserve(triangleCount * 3);
-    indices.reserve(triangleCount * 3);
+    for (size_t i = 0; i < m_Vertices.size(); i++)
+    {
+        Face f = m_Faces.at(m_Vertices.at(i).faceIndex);
+        vrm::Vertex v;
+        v.position = m_Vertices.at(i).position;
+        v.texCoords = { 0.f, 0.f };
+
+        auto positionFunction = [this](size_t i) -> glm::vec3 { return m_Vertices.at(i).position; };
+        v.normal = laplacian(i, positionFunction);
+
+        const glm::vec3 AB = m_Vertices.at(f.i1).position - m_Vertices.at(f.i0).position;
+        const glm::vec3 AC = m_Vertices.at(f.i2).position - m_Vertices.at(f.i0).position;
+        glm::vec3 flatNormal = glm::cross(AB, AC);
+        if (glm::dot(v.normal, flatNormal) < 0.f)
+            v.normal = -v.normal;
+
+        v.scalar = 0.f;
+
+        vertices.push_back(v);
+    }
 
     for (const auto& f : m_Faces)
     {
-        vrm::Vertex A, B, C;
-        A.position = m_Vertices.at(f.i0).position;
-        B.position = m_Vertices.at(f.i1).position;
-        C.position = m_Vertices.at(f.i2).position;
-
-        A.texCoords = { 0.f, 0.f };
-        B.texCoords = { 0.f, 0.f };
-        C.texCoords = { 0.f, 0.f };
-
-        const glm::vec3 AB = B.position - A.position;
-        const glm::vec3 AC = C.position - A.position;
-        const glm::vec3 flatNormal = glm::normalize(glm::cross(AB, AC));
-
-        auto positionFunction = [this](size_t i) -> glm::vec3 { return m_Vertices.at(i).position; };
-
-        // Rresults are visualy better if we normalize normals in the fragment shader only. I don't know why.
-        A.normal = laplacian(f.i0, positionFunction);
-        B.normal = laplacian(f.i1, positionFunction);
-        C.normal = laplacian(f.i2, positionFunction);
-
-        if (glm::dot(A.normal, flatNormal) < 0.f)
-            A.normal = -A.normal;
-        if (glm::dot(B.normal, flatNormal) < 0.f)
-            B.normal = -B.normal;
-        if (glm::dot(C.normal, flatNormal) < 0.f)
-            C.normal = -C.normal;
-
-        const uint32_t indexOffset = static_cast<uint32_t>(vertices.size());
-
-        vertices.push_back(A);
-        vertices.push_back(B);
-        vertices.push_back(C);
-
-        indices.push_back(indexOffset + 0);
-        indices.push_back(indexOffset + 1);
-        indices.push_back(indexOffset + 2);
+        indices.push_back(static_cast<uint32_t>(f.i0));
+        indices.push_back(static_cast<uint32_t>(f.i1));
+        indices.push_back(static_cast<uint32_t>(f.i2));
     }
 
     return vrm::MeshData{ std::move(vertices), std::move(indices) };

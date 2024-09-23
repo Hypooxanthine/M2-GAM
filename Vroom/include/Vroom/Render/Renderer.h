@@ -12,7 +12,6 @@
 #include "Vroom/Render/Clustering/LightRegistry.h"
 #include "Vroom/Render/Clustering/ClusteredLights.h"
 
-#include "Vroom/Asset/AssetInstance/MeshInstance.h"
 #include "Vroom/Asset/AssetInstance/ShaderInstance.h"
 
 #include "Vroom/Render/Camera/CameraBasic.h"
@@ -24,6 +23,7 @@ class Application;
 class Scene;
 struct PointLightComponent;
 class FrameBuffer;
+class MeshComponent;
 
 /**
  * @brief The renderer is responsible for rendering objects on the scene, taking lights and cameras into consideration.
@@ -77,12 +77,11 @@ public:
 	 * @brief Submits a mesh to be drawn.
 	 * 
 	 * @warning Model matrix must be still alive when calling endScene. This is needed because the renderer does not store the data, it only stores references to it.
-	 * No worries about the mesh, the mesh instance guarantees that the mesh is still alive.
 	 * 
 	 * @param mesh  The mesh to submit.
 	 * @param model  The model matrix.
 	 */
-	void submitMesh(const MeshInstance& mesh, const glm::mat4& model);
+	void submitMesh(const MeshComponent& mesh, const glm::mat4& model);
 
 	/**
 	 * @brief Submits a point light to be drawn.
@@ -94,14 +93,6 @@ public:
 	 * @param identifier  The identifier of the light.
 	 */
 	void submitPointLight(const glm::vec3& position, const PointLightComponent& pointLight, const std::string& identifier);
-
-	/**
-	 * @brief  Draws a mesh with a shader and a camera.
-	 * 
-	 * @param mesh  The mesh to draw.
-	 * @param model  The model matrix.
-	 */
-	void drawMesh(const MeshInstance& mesh, const glm::mat4& model) const;
 
 	/**
 	 * @brief Gets the viewport origin.
@@ -135,19 +126,27 @@ public:
 	void setViewportSize(const glm::vec<2, unsigned int>& s);
 
 private:
+	// Structs to store data to be drawn
+	struct QueuedMesh
+	{
+		const MeshComponent& meshComponent;
+		const glm::mat4& model;
+	};
+
+private:
 
 	/**
 	 * @brief Initializes OpenGl settings for the engine.
 	 */
 	Renderer();
 
-private:
-	// Structs to store data to be drawn
-	struct QueuedMesh
-	{
-		MeshInstance mesh;
-		const glm::mat4& model;
-	};
+	/**
+	 * @brief  Draws a mesh with a shader and a camera.
+	 * 
+	 * @param mesh  The mesh to draw.
+	 * @param model  The model matrix.
+	 */
+	void drawMesh(const QueuedMesh& mesh) const;
 
 private:
 	static std::unique_ptr<Renderer> s_Instance;

@@ -12,6 +12,7 @@ RenderMesh::RenderMesh(const MeshData& meshData)
     m_VertexBufferLayout.pushFloat(3);
     m_VertexBufferLayout.pushFloat(3);
     m_VertexBufferLayout.pushFloat(2);
+    m_VertexBufferLayout.pushFloat(1);
 
     m_VertexArray.addBuffer(m_VertexBuffer, m_VertexBufferLayout);
 }

@@ -1,0 +1,4 @@
+shading-model Phong
+
+vertex Resources/Shaders/Vertex_Curvature.glsl
+prefrag Resources/Shaders/PreFrag_Curvature.glsl

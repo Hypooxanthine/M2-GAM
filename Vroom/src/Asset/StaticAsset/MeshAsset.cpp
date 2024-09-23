@@ -12,7 +12,7 @@ namespace vrm
 {
 
 MeshAsset::SubMesh::SubMesh(RenderMesh&& render, MeshData&& data, MaterialInstance instance)
-    : renderMesh(std::move(render)), meshData(std::move(data)), materialInstance(instance)
+    : renderMesh(std::move(render)), meshData(std::move(data)), defaultMaterial(instance)
 {
 }
 

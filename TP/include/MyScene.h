@@ -30,6 +30,13 @@ protected:
 private:
 	void onImGui();
 
+	void showFlat();
+	void showLaplacianSmooth();
+	void showCurvature();
+	void showHeatDiffusion();
+
+	void updateHeatDiffusion(float dt);
+
 private:
     vrm::FirstPersonCamera m_Camera;
     float forwardValue = 0.f, rightValue = 0.f, upValue = 0.f;
@@ -43,4 +50,11 @@ private:
 
 	vrm::MeshAsset m_MeshAsset;
 	TriangularMesh m_TriangularMesh;
+	vrm::MeshData m_SmoothMeshData;
+
+	std::string m_ViewMode = "Flat";
+	float m_LastComputeTimeSeconds = 0.f;
+
+	size_t m_VertexHeatSource = 10;
+	float m_HeatSourceValue = 10.f;
 };

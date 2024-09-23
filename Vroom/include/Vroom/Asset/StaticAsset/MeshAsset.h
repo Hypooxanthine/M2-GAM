@@ -1,6 +1,6 @@
 #pragma once
 
-#include <list>
+#include <vector>
 
 #include "Vroom/Asset/StaticAsset/StaticAsset.h"
 #include "Vroom/Asset/AssetInstance/MeshInstance.h"
@@ -22,7 +22,7 @@ public:
 
         RenderMesh renderMesh;
         MeshData meshData;
-        MaterialInstance materialInstance;
+        MaterialInstance defaultMaterial;
     };
 
 public:
@@ -31,7 +31,7 @@ public:
 
     [[nodiscard]] MeshInstance createInstance();
 
-    const std::list<SubMesh>& getSubMeshes() const { return m_SubMeshes; }
+    const std::vector<SubMesh>& getSubMeshes() const { return m_SubMeshes; }
 
     void addSubmesh(const MeshData& mesh, MaterialInstance instance);
     void addSubmesh(const MeshData& mesh);
@@ -45,7 +45,7 @@ private:
     bool loadObj(const std::string& filePath);
 
 private:
-    std::list<SubMesh> m_SubMeshes;
+    std::vector<SubMesh> m_SubMeshes;
 };
 
 } // namespace vrm

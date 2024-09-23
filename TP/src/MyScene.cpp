@@ -9,6 +9,7 @@
 #include <Vroom/Scene/Components/PointLightComponent.h>
 
 #include <Vroom/Asset/AssetManager.h>
+#include <Vroom/Asset/StaticAsset/MaterialAsset.h>
 
 #include <glm/gtx/string_cast.hpp>
 
@@ -63,14 +64,8 @@ void MyScene::onInit()
     /* Processing */
 
     m_TriangularMesh.loadOFF("Resources/OffFiles/queen.off");
-    m_MeshAsset.addSubmesh(m_TriangularMesh.toSmoothMeshData());
 
     /* Visualization */
-
-    auto meshEntity = createEntity("Mesh");
-    meshEntity.addComponent<vrm::MeshComponent>(m_MeshAsset.createInstance());
-    meshEntity.getComponent<vrm::TransformComponent>().setPosition({ 0.f, 0.f, 0.f });
-    meshEntity.getComponent<vrm::TransformComponent>().setScale({ 10.f, 10.f, 10.f });
 
     auto lightEntity = createEntity("Light");
     auto& c =  lightEntity.addComponent<vrm::PointLightComponent>();
@@ -78,6 +73,8 @@ void MyScene::onInit()
     c.intensity = 1000000.f;
     c.radius = 2000.f;
     lightEntity.getComponent<vrm::TransformComponent>().setPosition({ -5.f, 1000.f , -5.f });
+    
+    showFlat();
 }
 
 void MyScene::onEnd()
@@ -98,6 +95,12 @@ void MyScene::onUpdate(float dt)
 
     lookUpValue = 0.f;
     turnRightValue = 0.f;
+
+    /* Heat diffusion simulation */
+
+    if (m_ViewMode == "Heat diffusion")
+        updateHeatDiffusion(dt);
+
 }
 
 void MyScene::onRender()
@@ -124,9 +127,146 @@ void MyScene::onImGui()
         ImGui::SliderFloat("##Camera angular speed", &myCameraAngularSpeed, 0.f, 0.1f);
     ImGui::End();
 
+    ImGui::Begin("Tweaks");
+    if (ImGui::BeginCombo("View mode", m_ViewMode.c_str()))
+    {
+        if (ImGui::Selectable("Flat"))
+        {
+            m_ViewMode = "Flat";
+            showFlat();
+        }
+
+        if (ImGui::Selectable("Laplacian smooth"))
+        {
+            m_ViewMode = "Laplacian smooth";
+            showLaplacianSmooth();
+        }
+        
+        if (ImGui::Selectable("Mean curvature"))
+        {
+            m_ViewMode = "Mean curvature";
+            showCurvature();
+        }
+        
+        if (ImGui::Selectable("Heat diffusion"))
+        {
+            m_ViewMode = "Heat diffusion";
+            showHeatDiffusion();
+        }
+
+        ImGui::EndCombo();
+    }
+    ImGui::End();
+
     ImGui::Begin("Stats");
         ImGui::TextWrapped("FPS: %.2f", ImGui::GetIO().Framerate);
-        ImGui::TextWrapped("Rendered vertices: %lu", m_MeshAsset.getSubMeshes().front().meshData.getVertexCount());
-        ImGui::TextWrapped("Rendered triangles: %lu", m_MeshAsset.getSubMeshes().front().meshData.getTriangleCount());
+        ImGui::TextWrapped("Last compute time: %.6f s", m_LastComputeTimeSeconds);
+        if (!m_MeshAsset.getSubMeshes().empty())
+        {
+            ImGui::TextWrapped("Rendered vertices: %lu", m_MeshAsset.getSubMeshes().front().meshData.getVertexCount());
+            ImGui::TextWrapped("Rendered triangles: %lu", m_MeshAsset.getSubMeshes().front().meshData.getTriangleCount());
+        }
     ImGui::End();
+}
+
+void MyScene::showFlat()
+{
+    if (entityExists("Mesh"))
+        destroyEntity(getEntity("Mesh"));
+
+    m_MeshAsset.clear();
+
+    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+    m_MeshAsset.addSubmesh(m_TriangularMesh.toMeshData());
+    std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+    m_LastComputeTimeSeconds = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1'000'000.f;
+
+    auto entity = createEntity("Mesh");
+    auto& meshComponent = entity.addComponent<vrm::MeshComponent>(m_MeshAsset.createInstance());
+    meshComponent.setMaterial(0, vrm::AssetManager::Get().getAsset<vrm::MaterialAsset>("Resources/Engine/Material/Mat_Default.asset"));
+    
+    entity.getComponent<vrm::TransformComponent>().setPosition({ 0.f, 0.f, 0.f });
+    entity.getComponent<vrm::TransformComponent>().setScale({ 10.f, 10.f, 10.f });
+}
+
+void MyScene::showLaplacianSmooth()
+{
+    if (entityExists("Mesh"))
+        destroyEntity(getEntity("Mesh"));
+
+    m_MeshAsset.clear();
+
+    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+    m_MeshAsset.addSubmesh(m_TriangularMesh.toSmoothMeshData());
+    std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+    m_LastComputeTimeSeconds = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1'000'000.f;
+
+    auto entity = createEntity("Mesh");
+    auto& meshComponent = entity.addComponent<vrm::MeshComponent>(m_MeshAsset.createInstance());
+    meshComponent.setMaterial(0, vrm::AssetManager::Get().getAsset<vrm::MaterialAsset>("Resources/Engine/Material/Mat_Default.asset"));
+    
+    entity.getComponent<vrm::TransformComponent>().setPosition({ 0.f, 0.f, 0.f });
+    entity.getComponent<vrm::TransformComponent>().setScale({ 10.f, 10.f, 10.f });
+}
+
+void MyScene::showCurvature()
+{
+    if (entityExists("Mesh"))
+        destroyEntity(getEntity("Mesh"));
+
+    m_MeshAsset.clear();
+
+    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+    m_MeshAsset.addSubmesh(m_TriangularMesh.toSmoothMeshData());
+    std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+    m_LastComputeTimeSeconds = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1'000'000.f;
+
+    auto entity = createEntity("Mesh");
+    auto& meshComponent = entity.addComponent<vrm::MeshComponent>(m_MeshAsset.createInstance());
+    meshComponent.setMaterial(0, vrm::AssetManager::Get().getAsset<vrm::MaterialAsset>("Resources/Material/Mat_Curvature.asset"));
+    
+    entity.getComponent<vrm::TransformComponent>().setPosition({ 0.f, 0.f, 0.f });
+    entity.getComponent<vrm::TransformComponent>().setScale({ 10.f, 10.f, 10.f });
+}
+
+void MyScene::showHeatDiffusion()
+{
+    m_SmoothMeshData = m_TriangularMesh.toSmoothMeshData();
+
+    for (glm::length_t i = 0; i < 3; i++)
+    {
+        auto vertexIndex = m_TriangularMesh.getFace(0).indices[i];
+        m_SmoothMeshData.getVertices().at(vertexIndex).scalar = m_HeatSourceValue;
+    }
+}
+
+void MyScene::updateHeatDiffusion(float dt)
+{
+    // Updating heat values
+
+    auto heatFunction = [this](size_t vertexIndex) -> float {
+        return m_SmoothMeshData.getVertices().at(vertexIndex).scalar;
+    };
+
+    
+    m_SmoothMeshData = std::move(m_TriangularMesh.toHeatMeshData(heatFunction, 0.0000001f));
+
+    for (glm::length_t i = 0; i < 3; i++)
+    {
+        auto vertexIndex = m_TriangularMesh.getFace(0).indices[i];
+        m_SmoothMeshData.getVertices().at(vertexIndex).scalar = m_HeatSourceValue;
+    }
+    
+    // Updating the mesh
+    if (entityExists("Mesh"))
+        destroyEntity(getEntity("Mesh"));
+
+    m_MeshAsset.clear();
+    m_MeshAsset.addSubmesh(m_SmoothMeshData, vrm::AssetManager::Get().getAsset<vrm::MaterialAsset>("Resources/Material/Mat_Heat.asset"));
+
+    auto entity = createEntity("Mesh");
+    auto& meshComponent = entity.addComponent<vrm::MeshComponent>(m_MeshAsset.createInstance());
+
+    entity.getComponent<vrm::TransformComponent>().setPosition({ 0.f, 0.f, 0.f });
+    entity.getComponent<vrm::TransformComponent>().setScale({ 10.f, 10.f, 10.f });
 }

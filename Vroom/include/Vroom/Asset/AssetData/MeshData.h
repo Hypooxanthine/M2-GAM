@@ -24,7 +24,9 @@ public:
     const uint32_t* getRawIndicesData() const { return m_Indices.data(); }
 
     const std::vector<Vertex>& getVertices() const { return m_Vertices; }
+    std::vector<Vertex>& getVertices() { return m_Vertices; }
     const std::vector<uint32_t>& getIndices() const { return m_Indices; }
+    std::vector<uint32_t>& getIndices() { return m_Indices; }
 
     size_t getIndexCount() const { return m_Indices.size(); }
     size_t getTriangleCount() const { return getIndexCount() / 3; }
