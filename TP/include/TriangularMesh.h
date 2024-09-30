@@ -56,25 +56,25 @@ public:
     // Adds a face with existing vertex indices and returns the index of the created face.
     size_t addFace(size_t v0, size_t v1, size_t v2);
 
-    inline size_t getVertexCount() const;
+    size_t getVertexCount() const;
 
-    inline size_t getFaceCount() const;
+    size_t getFaceCount() const;
 
     inline const Vertex& getVertex(size_t index) const { return m_Vertices.at(index); }
 
     inline const Face& getFace(size_t index) const { return m_Faces.at(index); }
 
-    inline glm::length_t localVertexIndex(size_t globalVertexIndex, size_t faceIndex) const;
+    glm::length_t localVertexIndex(size_t globalVertexIndex, size_t faceIndex) const;
 
-    inline size_t globalVertexIndex(glm::length_t localVertexIndex, size_t faceIndex) const;
+    size_t globalVertexIndex(glm::length_t localVertexIndex, size_t faceIndex) const;
 
-    inline size_t firstFaceIndex(size_t vertexIndex) const;
+    size_t firstFaceIndex(size_t vertexIndex) const;
 
-    inline size_t CCWFaceIndex(size_t vertexIndex, size_t faceIndex) const;
+    size_t CCWFaceIndex(size_t vertexIndex, size_t faceIndex) const;
 
-    inline size_t CWFaceIndex(size_t vertexIndex, size_t faceIndex) const;
+    size_t CWFaceIndex(size_t vertexIndex, size_t faceIndex) const;
 
-    inline size_t oppositeFaceIndex(size_t vertexIndex, size_t faceIndex) const;
+    size_t oppositeFaceIndex(size_t vertexIndex, size_t faceIndex) const;
 
     void printVertexPosition(size_t vertexIndex) const;
 
@@ -129,7 +129,7 @@ public: // Iterators
             return *this;
         }
 
-        Circulator_on_faces& operator++(int)
+        Circulator_on_faces operator++(int)
         {
             auto temp = *this;
             ++(*this);
@@ -194,7 +194,7 @@ public: // Iterators
             return *this;
         }
 
-        Circulator_on_vertices& operator++(int)
+        Circulator_on_vertices operator++(int)
         {
             auto temp = *this;
             ++(*this);

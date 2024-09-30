@@ -21,8 +21,6 @@ MyScene::MyScene()
     auto& gameLayer = vrm::Application::Get().getGameLayer();
 
     // Bind triggers to the camera
-    // This is a bit ugly. I might create some facilities that do this job in the future.
-    // Maybe another event type, which will give a scalar depending on the input (moveForward in [-1, 1] for example, controlled with any input we want).
     gameLayer.getTrigger("MoveForward")
         .bindCallback([this](bool triggered) { forwardValue += triggered ? 1.f : -1.f; });
     gameLayer.getTrigger("MoveBackward")

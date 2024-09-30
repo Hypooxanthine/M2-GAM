@@ -5,6 +5,7 @@
 #include <Vroom/Core/Window.h>
 
 #include "MyScene.h"
+#include "TriangulationScene.h"
 
 int main(int argc, char** argv)
 {
