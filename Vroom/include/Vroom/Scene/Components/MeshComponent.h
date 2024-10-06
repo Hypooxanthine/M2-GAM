@@ -68,6 +68,14 @@ public:
     const MaterialInstance& getMaterial(size_t slot) const;
 
     /**
+     * @brief Get the wireframe mode.
+     * 
+     * @return true The wireframe mode is enabled.
+     * @return false The wireframe mode is disabled.
+     */
+    bool getWireframe() const;
+
+    /**
      * @brief Set the mesh with default materials.
      * 
      * @param mesh The mesh instance.
@@ -90,9 +98,17 @@ public:
      */
     void setMaterial(size_t slot, const MaterialInstance& material);
 
+    /**
+     * @brief Set the wireframe mode.
+     * 
+     * @param wireframe The wireframe mode.
+     */
+    void setWireframe(bool wireframe);
+
 private:
     MeshInstance m_MeshInstance;
     std::vector<MaterialInstance> m_MaterialInstances;
+    bool m_Wireframe = false;
 };
 
 } // namespace vrm

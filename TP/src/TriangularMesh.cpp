@@ -58,6 +58,55 @@ size_t TriangularMesh::addFace(size_t v0, size_t v1, size_t v2)
     return m_Faces.size() - 1;
 }
 
+void TriangularMesh::splitFace(size_t faceIndex, const glm::vec3& vertexPosition)
+{
+    Face& f = m_Faces.at(faceIndex);
+
+    // Adding the vertex to the mesh
+    const auto vertexIndex = m_Vertices.size();
+    // We set its face to the face we are splitting, because this face will stay in the structure and then its index will stil be relevant
+    m_Vertices.push_back(Vertex{ vertexPosition, faceIndex });
+    
+    // Indices of the face before the split
+    const auto indices = f.indices;
+    // Neighbours of the face before the split
+    const auto neighbors = f.neighbours;
+
+    const auto f0 = faceIndex;
+    const auto f1 = m_Faces.size();
+    const auto f2 = f1 + 1;
+
+    m_Faces.reserve(m_Faces.size() + 2);
+
+    // Set the vertex face to the first one
+    m_Vertices.at(vertexIndex).faceIndex = f0;
+
+    // First face : just change the existing face
+    f.i2 = vertexIndex;
+    f.n0 = f1;
+    f.n1 = f2;
+    f.n2 = neighbors[2]; // Should not change
+
+    // Second face : create a new face
+    Face newFace;
+    newFace.i0 = vertexIndex;
+    newFace.i1 = indices[1];
+    newFace.i2 = indices[2];
+    newFace.n0 = neighbors[0];
+    newFace.n1 = f2;
+    newFace.n2 = f0;
+    m_Faces.push_back(newFace);
+
+    // Third face : create a new face
+    newFace.i0 = indices[0];
+    newFace.i1 = vertexIndex;
+    newFace.i2 = indices[2];
+    newFace.n0 = f1;
+    newFace.n1 = neighbors[1];
+    newFace.n2 = f0;
+    m_Faces.push_back(newFace);
+}
+
 size_t TriangularMesh::getVertexCount() const
 {
     return m_Vertices.size();

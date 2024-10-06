@@ -39,6 +39,8 @@ int main(int argc, char** argv)
 		.bindInput(vrm::KeyCode::Down);
 
 	// Create some custom events, which are more general than triggers
+	gameLayer.createCustomEvent("MouseRight")
+		.bindInput(vrm::Event::Type::MousePressed, vrm::MouseCode::Right);
 	gameLayer.createCustomEvent("MouseMoved")
 		.bindInput(vrm::Event::Type::MouseMoved);
 	gameLayer.createCustomEvent("Exit")
@@ -47,7 +49,7 @@ int main(int argc, char** argv)
 		.bindCallback([&app](const vrm::Event&) { app.exit(); });
 	
 	// Load the custom scene
-	gameLayer.loadScene<MyScene>();
+	gameLayer.loadScene<TriangulationScene>();
 
 	// Run the application
 	app.run();

@@ -56,6 +56,8 @@ public:
     // Adds a face with existing vertex indices and returns the index of the created face.
     size_t addFace(size_t v0, size_t v1, size_t v2);
 
+    void splitFace(size_t faceIndex, const glm::vec3& vertexPosition);
+
     size_t getVertexCount() const;
 
     size_t getFaceCount() const;

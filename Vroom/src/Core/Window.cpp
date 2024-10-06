@@ -246,6 +246,8 @@ void Window::mouseCallback(int button, int action, int mods)
 
     Event& e = m_EventQueue.emplace();
     e.mouseCode = code;
+    e.mouseX = lastMouseX;
+    e.mouseY = lastMouseY;
     if (action == GLFW_PRESS)
         e.type = Event::Type::MousePressed;
     else

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "imgui.h"
+#include "TriangularMesh.h"
 
 class TriangulationScene : public vrm::Scene
 {
@@ -28,6 +29,9 @@ protected:
 private:
 	void onImGui();
 
+	void onRightClick(int mouseX, int mouseY);
+	void updateTriangularMesh();
+
 private:
     vrm::FirstPersonCamera m_Camera;
     float forwardValue = 0.f, rightValue = 0.f, upValue = 0.f;
@@ -38,4 +42,7 @@ private:
 	ImFont* m_Font = nullptr;
 
 	bool m_ControlsEnabled = true;
+
+	vrm::MeshAsset m_TriangularMeshAsset;
+	TriangularMesh m_TriangularMesh;
 };

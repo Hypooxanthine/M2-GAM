@@ -36,6 +36,11 @@ const MaterialInstance& MeshComponent::getMaterial(size_t index) const
     return m_MaterialInstances.at(index);
 }
 
+bool MeshComponent::getWireframe() const
+{
+    return m_Wireframe;
+}
+
 void MeshComponent::setMesh(const MeshInstance& meshInstance)
 {
     m_MeshInstance = meshInstance;
@@ -57,6 +62,11 @@ void MeshComponent::setMaterial(size_t slot, const MaterialInstance& material)
 {
     VRM_ASSERT_MSG(slot < m_MaterialInstances.size(), "Invalid material slot.");
     m_MaterialInstances.at(slot) = material;
+}
+
+void MeshComponent::setWireframe(bool wireframe)
+{
+    m_Wireframe = wireframe;
 }
 
 } // namespace vrm

@@ -15,6 +15,8 @@
 
 #include "imgui.h"
 
+#include "RayCasting.h"
+
 TriangulationScene::TriangulationScene()
     : vrm::Scene(), m_Camera(0.1f, 100.f, glm::radians(90.f), 600.f / 400.f, { 0.5f, 10.f, 20.f }, { glm::radians(45.f), 0.f, 0.f })
 {
@@ -41,6 +43,10 @@ TriangulationScene::TriangulationScene()
             m_MouseLock = triggered;
             vrm::Application::Get().getWindow().setCursorVisible(!triggered);
         });
+    gameLayer.getCustomEvent("MouseRight")
+        .bindCallback([&, this](const vrm::Event& e) {
+            onRightClick(e.mouseX, e.mouseY);
+        });
     
     gameLayer.getCustomEvent("MouseMoved")
         .bindCallback([this](const vrm::Event& event) {
@@ -60,8 +66,19 @@ void TriangulationScene::onInit()
     setCamera(&m_Camera);
 
     /* Processing */
+    //m_TriangularMesh.loadOFF("Resources/OffFiles/queen.off");
+    //m_TriangularMeshAsset.addSubmesh(m_TriangularMesh.toMeshData());
 
     /* Visualization */
+    auto supportEntity = createEntity("Support");
+    auto& supportMesh = supportEntity.addComponent<vrm::MeshComponent>(vrm::AssetManager::Get().getAsset<vrm::MeshAsset>("Resources/Meshes/Support.obj"));
+    auto& supportTransform = supportEntity.getComponent<vrm::TransformComponent>();
+    supportTransform.setScale({ 10.f, 10.f, 10.f });
+    supportMesh.setWireframe(true);
+
+    auto triangularMeshEntity = createEntity("TriangularMesh");
+    auto& triangularMeshMesh = triangularMeshEntity.addComponent<vrm::MeshComponent>(m_TriangularMeshAsset.createInstance());
+    triangularMeshMesh.setWireframe(false);
 
     auto lightEntity = createEntity("Light");
     auto& c =  lightEntity.addComponent<vrm::PointLightComponent>();
@@ -121,4 +138,39 @@ void TriangulationScene::onImGui()
     ImGui::Begin("Stats");
         ImGui::TextWrapped("FPS: %.2f", ImGui::GetIO().Framerate);
     ImGui::End();
+}
+
+void TriangulationScene::onRightClick(int mouseX, int mouseY)
+{
+    const auto width = vrm::Application::Get().getGameLayer().getFrameBuffer().getSpecification().width;
+    const auto height = vrm::Application::Get().getGameLayer().getFrameBuffer().getSpecification().height;
+
+    Ray ray = Math::RayUnderCursor(m_Camera.getPosition(), m_Camera.getViewProjection(), { mouseX, mouseY }, { width, height });
+    auto e = getEntity("Support");
+    HitResult hit = Math::RayCastWithMesh(ray, e.getComponent<vrm::MeshComponent>(), e.getComponent<vrm::TransformComponent>().getTransform());
+
+    if (hit.hasHit)
+    {
+        VRM_LOG_TRACE("Mouse position: ({}, {}) / ({}, {})", mouseX, mouseY, width, height);
+        VRM_LOG_TRACE("Hit at position: {}", glm::to_string(hit.position));
+        TriangularMesh::Vertex v;
+        v.position = hit.position;
+        m_TriangularMesh.addVertex(v);
+        auto vertexCount = m_TriangularMesh.getVertexCount();
+        if (vertexCount > 2)
+        {
+            m_TriangularMesh.addFace(vertexCount - 3, vertexCount - 2, vertexCount - 1);
+            updateTriangularMesh();
+        }
+    }
+}
+
+void TriangulationScene::updateTriangularMesh()
+{
+    auto data = m_TriangularMesh.toMeshData();
+    m_TriangularMeshAsset.clear();
+    m_TriangularMeshAsset.addSubmesh(data);
+
+    auto e = getEntity("TriangularMesh");
+    e.getComponent<vrm::MeshComponent>().setMesh(m_TriangularMeshAsset.createInstance());
 }

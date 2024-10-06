@@ -130,6 +130,11 @@ void Renderer::drawMesh(const QueuedMesh& mesh) const
 
     const auto cameraPos = m_Camera->getPosition();
 
+    if (mesh.meshComponent.getWireframe())
+        GLCall(glPolygonMode(GL_FRONT_AND_BACK, GL_LINE));
+    else
+        GLCall(glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
+
     for (size_t i = 0; i < mesh.meshComponent.getSubMeshCount(); i++)
     {
         const auto& subMeshRenderMesh = mesh.meshComponent.getRenderMesh(i);
