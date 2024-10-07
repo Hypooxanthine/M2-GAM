@@ -76,8 +76,6 @@ void TriangularMesh::splitFace(size_t faceIndex, const glm::vec3& vertexPosition
     const auto f1 = m_Faces.size();
     const auto f2 = f1 + 1;
 
-    m_Faces.reserve(m_Faces.size() + 2);
-
     // Set the vertex face to the first one
     m_Vertices.at(vertexIndex).faceIndex = f0;
 
@@ -105,6 +103,47 @@ void TriangularMesh::splitFace(size_t faceIndex, const glm::vec3& vertexPosition
     newFace.n1 = neighbors[1];
     newFace.n2 = f0;
     m_Faces.push_back(newFace);
+}
+
+size_t TriangularMesh::getTriangleContainingPoint(const glm::vec3& vertexPosition) const
+{
+    glm::vec2 p = glm::vec2(vertexPosition.x, vertexPosition.z);
+
+    for (size_t f_i = 0; f_i < m_Faces.size(); f_i++)
+    {
+        const auto& f = m_Faces.at(f_i);
+        bool inside = true;
+
+        for (glm::length_t i = 0; i < 3; i++)
+        {
+            const glm::length_t i_next = (i + 1) % 3;
+            const auto& v_i = m_Vertices.at(f.indices[i]);
+            const auto& v_i_next = m_Vertices.at(f.indices[i_next]);
+            const glm::vec2 v_i_2D = glm::vec2(v_i.position.x, v_i.position.z);
+            const glm::vec2 v_i_next_2D = glm::vec2(v_i_next.position.x, v_i_next.position.z);
+            
+            const auto det = glm::determinant(glm::mat2(p - v_i_2D, v_i_next_2D - v_i_2D));
+
+            if (det < 0.f)
+            {
+                inside = false;
+                break;
+            }
+        }
+
+        if (inside)
+            return f_i;
+    }
+
+    throw std::runtime_error("No containing triangle has been found.");
+}
+
+void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPosition)
+{
+    // For now : we assume the vertex is inside the convex envelope
+
+    auto containingTriangleID = getTriangleContainingPoint(vertexPosition);
+    splitFace(containingTriangleID, vertexPosition);
 }
 
 size_t TriangularMesh::getVertexCount() const

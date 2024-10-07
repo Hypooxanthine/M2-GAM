@@ -4,19 +4,21 @@
 
 #include <Vroom/Asset/AssetData/MeshData.h>
 
-Ray Math::RayUnderCursor(const glm::vec3& cameraPos, const glm::mat4& viewProjection, const glm::vec2& cursorPos, const glm::vec2& viewportSize)
+Ray Math::RayUnderCursor(const glm::vec3& cameraPos, const glm::mat4& view, const glm::mat4& projection, const glm::vec2& cursorPos, const glm::vec2& viewportSize)
 {
     Ray out;
     out.origin = cameraPos;
 
-    float mouseX = 2.f * cursorPos.x / viewportSize.x - 1.f;
-    float mouseY = 2.f * cursorPos.y / viewportSize.y - 1.f;
+    const float mouseX = 2.f * cursorPos.x / viewportSize.x - 1.f;
+    const float mouseY = 1.f - 2.f * cursorPos.y / viewportSize.y;
 
-    glm::mat4 invVP = glm::inverse(viewProjection);
-    glm::vec4 screenPos = glm::vec4(mouseX, -mouseY, 1.f, 1.f);
-    glm::vec4 worldPos = invVP * screenPos;
+    const glm::vec4 rayClip = glm::vec4(mouseX, mouseY, -1.f, 1.f);
+    glm::vec4 rayView = glm::inverse(projection) * rayClip;
+    rayView.z = -1.f;
+    rayView.w = 0.f;
+    const glm::vec3 rayWorld = glm::inverse(view) * rayView;
 
-    out.direction = glm::normalize(glm::vec3(worldPos));
+    out.direction = glm::normalize(rayWorld);
 
     return out;
 }
@@ -66,6 +68,23 @@ HitResult Math::RayCastWithMesh(const Ray& ray, const vrm::MeshComponent& mesh, 
         out.normal = glm::normalize(n);
         out.position = P;
     }
+
+    return out;
+}
+
+HitResult Math::RayCastWithPlane(const Ray& ray, const glm::vec3& planeNormal, const glm::vec3& planePoint)
+{
+    HitResult out;
+    out.hasHit = false;
+
+    float depth = glm::dot(planeNormal, planePoint - ray.origin) / glm::dot(planeNormal, ray.direction);
+
+    if(depth < 0) return out;
+
+    out.hasHit = true;
+    out.depth = depth;
+    out.position = ray.origin + depth * ray.direction;
+    out.normal = planeNormal;
 
     return out;
 }

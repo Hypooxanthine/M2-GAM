@@ -18,7 +18,7 @@
 #include "RayCasting.h"
 
 TriangulationScene::TriangulationScene()
-    : vrm::Scene(), m_Camera(0.1f, 100.f, glm::radians(90.f), 600.f / 400.f, { 0.5f, 10.f, 20.f }, { glm::radians(45.f), 0.f, 0.f })
+    : vrm::Scene(), m_Camera(0.1f, 100.f, glm::radians(90.f), 600.f / 400.f, { 0.f, 10.f, 0.f }, { glm::radians(90.f), 0.f, 0.f })
 {
     auto& gameLayer = vrm::Application::Get().getGameLayer();
 
@@ -70,15 +70,15 @@ void TriangulationScene::onInit()
     //m_TriangularMeshAsset.addSubmesh(m_TriangularMesh.toMeshData());
 
     /* Visualization */
-    auto supportEntity = createEntity("Support");
-    auto& supportMesh = supportEntity.addComponent<vrm::MeshComponent>(vrm::AssetManager::Get().getAsset<vrm::MeshAsset>("Resources/Meshes/Support.obj"));
-    auto& supportTransform = supportEntity.getComponent<vrm::TransformComponent>();
-    supportTransform.setScale({ 10.f, 10.f, 10.f });
-    supportMesh.setWireframe(true);
+    //auto supportEntity = createEntity("Support");
+    //auto& supportMesh = supportEntity.addComponent<vrm::MeshComponent>(vrm::AssetManager::Get().getAsset<vrm::MeshAsset>("Resources/Meshes/Support.obj"));
+    //auto& supportTransform = supportEntity.getComponent<vrm::TransformComponent>();
+    //supportTransform.setScale({ 10.f, 10.f, 10.f });
+    //supportMesh.setWireframe(true);
 
     auto triangularMeshEntity = createEntity("TriangularMesh");
     auto& triangularMeshMesh = triangularMeshEntity.addComponent<vrm::MeshComponent>(m_TriangularMeshAsset.createInstance());
-    triangularMeshMesh.setWireframe(false);
+    triangularMeshMesh.setWireframe(m_WireFrame);
 
     auto lightEntity = createEntity("Light");
     auto& c =  lightEntity.addComponent<vrm::PointLightComponent>();
@@ -133,6 +133,18 @@ void TriangulationScene::onImGui()
     ImGui::End();
 
     ImGui::Begin("Tweaks");
+        if (ImGui::Checkbox("Wireframe", &m_WireFrame))
+            getEntity("TriangularMesh").getComponent<vrm::MeshComponent>().setWireframe(m_WireFrame);
+        if (ImGui::BeginCombo("Edit mode", m_EditModeLabel.c_str()))
+        {
+            if (ImGui::Selectable("Place vertices"))
+            {
+                m_EditModeLabel = "Place vertices";
+                m_EditMode = EditMode::PLACE_VERTICES;
+            }
+
+            ImGui::EndCombo();
+        }
     ImGui::End();
 
     ImGui::Begin("Stats");
@@ -145,21 +157,31 @@ void TriangulationScene::onRightClick(int mouseX, int mouseY)
     const auto width = vrm::Application::Get().getGameLayer().getFrameBuffer().getSpecification().width;
     const auto height = vrm::Application::Get().getGameLayer().getFrameBuffer().getSpecification().height;
 
-    Ray ray = Math::RayUnderCursor(m_Camera.getPosition(), m_Camera.getViewProjection(), { mouseX, mouseY }, { width, height });
-    auto e = getEntity("Support");
-    HitResult hit = Math::RayCastWithMesh(ray, e.getComponent<vrm::MeshComponent>(), e.getComponent<vrm::TransformComponent>().getTransform());
+    const Ray ray = Math::RayUnderCursor(m_Camera.getPosition(), m_Camera.getView(), m_Camera.getProjection(), { mouseX, mouseY }, { width, height });
+    const HitResult hit = Math::RayCastWithPlane(ray, { 0.f, 1.f, 0.f }, { 0.f, 0.f, 0.f });
 
-    if (hit.hasHit)
+    if (!hit.hasHit) return;
+
+    if (m_EditMode == EditMode::PLACE_VERTICES)
     {
         VRM_LOG_TRACE("Mouse position: ({}, {}) / ({}, {})", mouseX, mouseY, width, height);
         VRM_LOG_TRACE("Hit at position: {}", glm::to_string(hit.position));
-        TriangularMesh::Vertex v;
-        v.position = hit.position;
-        m_TriangularMesh.addVertex(v);
-        auto vertexCount = m_TriangularMesh.getVertexCount();
-        if (vertexCount > 2)
+
+        if (m_TriangularMesh.getVertexCount() < 3)
         {
-            m_TriangularMesh.addFace(vertexCount - 3, vertexCount - 2, vertexCount - 1);
+            TriangularMesh::Vertex v;
+            v.position = hit.position;
+            m_TriangularMesh.addVertex(v);
+
+            if (m_TriangularMesh.getVertexCount() == 3)
+            {
+                m_TriangularMesh.addFace(0, 1, 2);
+                updateTriangularMesh();
+            }
+        }
+        else
+        {
+            m_TriangularMesh.addVertex_StreamingTriangulation(hit.position);
             updateTriangularMesh();
         }
     }

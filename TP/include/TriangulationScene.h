@@ -41,8 +41,18 @@ private:
 
 	ImFont* m_Font = nullptr;
 
-	bool m_ControlsEnabled = true;
+	bool m_ControlsEnabled = false;
 
 	vrm::MeshAsset m_TriangularMeshAsset;
 	TriangularMesh m_TriangularMesh;
+	bool m_WireFrame = true;
+
+	std::string m_EditModeLabel = "Place vertices";
+	enum class EditMode
+	{
+		PLACE_VERTICES = 0,
+	};
+	
+	EditMode m_EditMode = EditMode::PLACE_VERTICES;
+
 };

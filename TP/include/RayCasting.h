@@ -27,8 +27,9 @@ struct HitResult
 class Math
 {
 public:
-    static Ray RayUnderCursor(const glm::vec3& cameraPos, const glm::mat4& viewProjection, const glm::vec2& cursorPos, const glm::vec2& viewportSize);
+    static Ray RayUnderCursor(const glm::vec3& cameraPos, const glm::mat4& view, const glm::mat4& projection, const glm::vec2& cursorPos, const glm::vec2& viewportSize);
     static HitResult RayCastWithMesh(const Ray& ray, const vrm::MeshComponent& mesh, const glm::mat4& modelMatrix);
+    static HitResult RayCastWithPlane(const Ray& ray, const glm::vec3& planeNormal, const glm::vec3& planePoint);
 
     /**
      * @brief This assumes that vectors are collinear.

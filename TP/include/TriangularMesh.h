@@ -58,6 +58,10 @@ public:
 
     void splitFace(size_t faceIndex, const glm::vec3& vertexPosition);
 
+    size_t getTriangleContainingPoint(const glm::vec3& vertexPosition) const;
+
+    void addVertex_StreamingTriangulation(const glm::vec3& vertexPosition);
+
     size_t getVertexCount() const;
 
     size_t getFaceCount() const;
