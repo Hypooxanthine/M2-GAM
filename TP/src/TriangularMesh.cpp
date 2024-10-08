@@ -7,6 +7,14 @@
 
 #include <glm/gtx/string_cast.hpp>
 
+TriangularMesh::TriangularMesh()
+{
+    Vertex infiniteVertex;
+    infiniteVertex.position = { 0.f, 0.f, 0.f };
+    infiniteVertex.faceIndex = 1;
+    m_Vertices.push_back(infiniteVertex);
+}
+
 size_t TriangularMesh::addVertex(const Vertex& v)
 {
     m_Vertices.push_back(v);
@@ -15,6 +23,9 @@ size_t TriangularMesh::addVertex(const Vertex& v)
 
 size_t TriangularMesh::addFace(size_t v0, size_t v1, size_t v2)
 {
+    // Incrementing the indices because of the infinite vertex
+    // and we don't want user to bother with it
+    v0++; v1++; v2++;
     VRM_ASSERT(v0 < m_Vertices.size());
     VRM_ASSERT(v1 < m_Vertices.size());
     VRM_ASSERT(v2 < m_Vertices.size());
@@ -58,7 +69,7 @@ size_t TriangularMesh::addFace(size_t v0, size_t v1, size_t v2)
     return m_Faces.size() - 1;
 }
 
-void TriangularMesh::splitFace(size_t faceIndex, const glm::vec3& vertexPosition)
+void TriangularMesh::faceSplit(size_t faceIndex, const glm::vec3& vertexPosition)
 {
     Face& f = m_Faces.at(faceIndex);
 
@@ -105,7 +116,91 @@ void TriangularMesh::splitFace(size_t faceIndex, const glm::vec3& vertexPosition
     m_Faces.push_back(newFace);
 }
 
-size_t TriangularMesh::getTriangleContainingPoint(const glm::vec3& vertexPosition) const
+void TriangularMesh::edgeFlip(size_t vertexIndex0, size_t vertexIndex1)
+{
+    VRM_LOG_TRACE("Flipping edge between vertices {} and {}", vertexIndex0, vertexIndex1);
+
+    // Searching for incident faces
+    size_t if0 = 0, if1 = CWFaceIndex(vertexIndex0, firstFaceIndex(vertexIndex0));
+    glm::length_t v00 = 0;
+    glm::length_t v10 = 0;
+    bool found = false;
+    for (auto it = begin_turning_faces(vertexIndex0); it != end_turning_faces(vertexIndex0); ++it)
+    {
+        if0 = if1;
+        if1 = *it;
+        const auto& f1 = m_Faces.at(if1);
+        auto vertexIndex0_localf1 = localVertexIndex(vertexIndex0, if1);
+
+        if (f1.indices[(vertexIndex0_localf1 + 1) % 3] == vertexIndex1)
+        {
+            found = true;
+
+            v00 = (localVertexIndex(vertexIndex0, if0) + 1) % 3;
+            v10 = (localVertexIndex(vertexIndex1, if1) + 1) % 3;
+            break;
+        }
+    }
+
+    VRM_ASSERT_MSG(found, "Edge not found.");
+    VRM_LOG_TRACE("Faces found : {} and {}", if0, if1);
+
+    auto& f0 = m_Faces.at(if0);
+    auto& f1 = m_Faces.at(if1);
+    size_t ifp0 = f0.neighbours[(v00 + 1) % 3];
+    auto& fp0 = m_Faces.at(ifp0);
+    size_t ifp1 = f1.neighbours[(v10 + 1) % 3];
+    auto& fp1 = m_Faces.at(ifp1);
+    size_t iv00 = f0.indices[v00];
+    size_t iv11 = f1.indices[v10];
+    glm::length_t vp00 = localVertexIndex(iv00, ifp0);
+    glm::length_t vp10 = localVertexIndex(iv11, ifp1);
+
+    // rearrange the faces
+    f0.indices[(v00 + 2) % 3] = iv11;
+    f0.neighbours[(v00 + 0) % 3] = ifp1;
+    fp1.neighbours[(vp10 + 2) % 3] = if0;
+    f0.neighbours[(v00 + 1) % 3] = if1;
+
+    f1.indices[(v10 + 2) % 3] = iv00;
+    f1.neighbours[(v10 + 0) % 3] = ifp0;
+    fp0.neighbours[(vp00 + 2) % 3] = if1;
+    f1.neighbours[(v10 + 1) % 3] = if0;
+}
+
+void TriangularMesh::edgeFlip(const glm::vec3& coords)
+{
+    try {
+        auto containingFaceID = getFaceContainingPoint(coords);
+        auto& f = m_Faces.at(containingFaceID);
+        
+        float minDet = std::numeric_limits<float>::max();
+        size_t v0 = 0, v1 = 0;
+        for (glm::length_t i = 0; i < 3; i++)
+        {
+            const auto& v_i = m_Vertices.at(f.indices[i]);
+            const auto& v_i_next = m_Vertices.at(f.indices[(i + 1) % 3]);
+            float det = glm::determinant(glm::mat3(
+                v_i_next.position - v_i.position,
+                coords - v_i.position,
+                glm::vec3(0.f, 1.f, 0.f)
+            ));
+
+            if (det < minDet)
+            {
+                minDet = det;
+                v0 = f.indices[i];
+                v1 = f.indices[(i + 1) % 3];
+            }
+        }
+
+        edgeFlip(v0, v1);
+    } catch (const std::runtime_error& e) {
+        VRM_LOG_ERROR("Errore while flipping edge: {}", e.what());
+    }
+}
+
+size_t TriangularMesh::getFaceContainingPoint(const glm::vec3& vertexPosition) const
 {
     glm::vec2 p = glm::vec2(vertexPosition.x, vertexPosition.z);
 
@@ -135,15 +230,17 @@ size_t TriangularMesh::getTriangleContainingPoint(const glm::vec3& vertexPositio
             return f_i;
     }
 
-    throw std::runtime_error("No containing triangle has been found.");
+    throw std::runtime_error("No containing face has been found.");
 }
 
 void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPosition)
 {
-    // For now : we assume the vertex is inside the convex envelope
-
-    auto containingTriangleID = getTriangleContainingPoint(vertexPosition);
-    splitFace(containingTriangleID, vertexPosition);
+    try {
+        auto containingFaceID = getFaceContainingPoint(vertexPosition);
+        faceSplit(containingFaceID, vertexPosition);
+    } catch (const std::runtime_error& e) {
+        VRM_LOG_ERROR("Error while adding vertex: {}", e.what());
+    }
 }
 
 size_t TriangularMesh::getVertexCount() const

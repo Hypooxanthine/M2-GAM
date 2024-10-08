@@ -50,15 +50,21 @@ public:
         };
     };
 public:
+    TriangularMesh();
+
     // Adds a vertex and returns its index.
     size_t addVertex(const Vertex& v);
     
     // Adds a face with existing vertex indices and returns the index of the created face.
     size_t addFace(size_t v0, size_t v1, size_t v2);
 
-    void splitFace(size_t faceIndex, const glm::vec3& vertexPosition);
+    void faceSplit(size_t faceIndex, const glm::vec3& vertexPosition);
 
-    size_t getTriangleContainingPoint(const glm::vec3& vertexPosition) const;
+    void edgeFlip(size_t vertexIndex0, size_t vertexIndex1);
+
+    void edgeFlip(const glm::vec3& coords);
+
+    size_t getFaceContainingPoint(const glm::vec3& vertexPosition) const;
 
     void addVertex_StreamingTriangulation(const glm::vec3& vertexPosition);
 
@@ -115,14 +121,23 @@ public: // Iterators
     {
     public:
         using iterator_category = std::bidirectional_iterator_tag;
+        using value_type = size_t;
+        using difference_type = int;
+        using pointer = size_t*;
+        using reference = size_t&;
         
     public:
-        Circulator_on_faces(const TriangularMesh& mesh, size_t vertexIndex, size_t faceIndex, size_t count = 0)
+        Circulator_on_faces(const TriangularMesh& mesh, size_t vertexIndex, size_t faceIndex, int count = 0)
             : m_Mesh(mesh), m_VertexIndex(vertexIndex), m_FaceIndex(faceIndex), m_Count(count)
         {
         }
 
         size_t operator*() const
+        {
+            return m_FaceIndex;
+        }
+
+        size_t operator->() const
         {
             return m_FaceIndex;
         }
@@ -171,7 +186,7 @@ public: // Iterators
         const TriangularMesh& m_Mesh;
         size_t m_VertexIndex;
         size_t m_FaceIndex;
-        size_t m_Count = 0;
+        int m_Count = 0;
     };
 
     class Circulator_on_vertices
@@ -180,7 +195,7 @@ public: // Iterators
         using iterator_category = std::bidirectional_iterator_tag;
         
     public:
-        Circulator_on_vertices(const TriangularMesh& mesh, size_t vertexIndex, size_t count = 0)
+        Circulator_on_vertices(const TriangularMesh& mesh, size_t vertexIndex, int count = 0)
             : m_Mesh(mesh), m_VertexIndex(vertexIndex), m_Face(mesh, vertexIndex, mesh.firstFaceIndex(vertexIndex), count), m_Count(count)
         {
             m_TurningVertexIndex_local = (m_Mesh.localVertexIndex(m_VertexIndex, *m_Face) + 1) % 3;
@@ -238,7 +253,7 @@ public: // Iterators
         size_t m_VertexIndex;
         Circulator_on_faces m_Face;
         glm::length_t m_TurningVertexIndex_local;
-        size_t m_Count = 0;
+        int m_Count = 0;
     };
 
 public: // Iterator access

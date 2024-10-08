@@ -45,7 +45,7 @@ TriangulationScene::TriangulationScene()
         });
     gameLayer.getCustomEvent("MouseRight")
         .bindCallback([&, this](const vrm::Event& e) {
-            onRightClick(e.mouseX, e.mouseY);
+            onRightClick(static_cast<int>(e.mouseX), static_cast<int>(e.mouseY));
         });
     
     gameLayer.getCustomEvent("MouseMoved")
@@ -66,19 +66,19 @@ void TriangulationScene::onInit()
     setCamera(&m_Camera);
 
     /* Processing */
-    //m_TriangularMesh.loadOFF("Resources/OffFiles/queen.off");
-    //m_TriangularMeshAsset.addSubmesh(m_TriangularMesh.toMeshData());
+    m_TriangularMesh.addVertex({ { 0.f, 0.f,  5.f } });
+    m_TriangularMesh.addVertex({ { 0.f, 0.f, -5.f } });
+    m_TriangularMesh.addVertex({ {  5.f, 0.f, 0.f } });
+    m_TriangularMesh.addVertex({ { -5.f, 0.f, 0.f } });
+    m_TriangularMesh.addFace(0, 2, 3);
+    m_TriangularMesh.addFace(3, 2, 1);
 
     /* Visualization */
-    //auto supportEntity = createEntity("Support");
-    //auto& supportMesh = supportEntity.addComponent<vrm::MeshComponent>(vrm::AssetManager::Get().getAsset<vrm::MeshAsset>("Resources/Meshes/Support.obj"));
-    //auto& supportTransform = supportEntity.getComponent<vrm::TransformComponent>();
-    //supportTransform.setScale({ 10.f, 10.f, 10.f });
-    //supportMesh.setWireframe(true);
 
     auto triangularMeshEntity = createEntity("TriangularMesh");
     auto& triangularMeshMesh = triangularMeshEntity.addComponent<vrm::MeshComponent>(m_TriangularMeshAsset.createInstance());
     triangularMeshMesh.setWireframe(m_WireFrame);
+    updateTriangularMesh();
 
     auto lightEntity = createEntity("Light");
     auto& c =  lightEntity.addComponent<vrm::PointLightComponent>();
@@ -142,9 +142,18 @@ void TriangulationScene::onImGui()
                 m_EditModeLabel = "Place vertices";
                 m_EditMode = EditMode::PLACE_VERTICES;
             }
+            else if (ImGui::Selectable("Flip edge"))
+            {
+                m_EditModeLabel = "Flip edge";
+                m_EditMode = EditMode::FLIP_EDGE;
+            }
 
             ImGui::EndCombo();
         }
+        if (ImGui::Button("Reset"))
+            resetTriangularMesh();
+        if (ImGui::Button("Edge flip test"))
+            triangularMeshToEdgeFlipTest();
     ImGui::End();
 
     ImGui::Begin("Stats");
@@ -164,9 +173,6 @@ void TriangulationScene::onRightClick(int mouseX, int mouseY)
 
     if (m_EditMode == EditMode::PLACE_VERTICES)
     {
-        VRM_LOG_TRACE("Mouse position: ({}, {}) / ({}, {})", mouseX, mouseY, width, height);
-        VRM_LOG_TRACE("Hit at position: {}", glm::to_string(hit.position));
-
         if (m_TriangularMesh.getVertexCount() < 3)
         {
             TriangularMesh::Vertex v;
@@ -185,6 +191,31 @@ void TriangulationScene::onRightClick(int mouseX, int mouseY)
             updateTriangularMesh();
         }
     }
+    else if (m_EditMode == EditMode::FLIP_EDGE)
+    {
+        if (m_TriangularMesh.getFaceCount() == 0) return;
+        
+        m_TriangularMesh.edgeFlip(glm::vec3(hit.position.x, 0.f, hit.position.z));
+        updateTriangularMesh();
+    }
+}
+
+void TriangulationScene::resetTriangularMesh()
+{
+    m_TriangularMesh = TriangularMesh();
+    updateTriangularMesh();
+}
+
+void TriangulationScene::triangularMeshToEdgeFlipTest()
+{
+    m_TriangularMesh = TriangularMesh();
+    m_TriangularMesh.addVertex({ { 0.f, 0.f,  5.f } });
+    m_TriangularMesh.addVertex({ { 0.f, 0.f, -5.f } });
+    m_TriangularMesh.addVertex({ {  5.f, 0.f, 0.f } });
+    m_TriangularMesh.addVertex({ { -5.f, 0.f, 0.f } });
+    m_TriangularMesh.addFace(0, 2, 3);
+    m_TriangularMesh.addFace(3, 2, 1);
+    updateTriangularMesh();
 }
 
 void TriangulationScene::updateTriangularMesh()

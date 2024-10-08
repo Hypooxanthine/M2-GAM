@@ -30,6 +30,9 @@ private:
 	void onImGui();
 
 	void onRightClick(int mouseX, int mouseY);
+
+	void resetTriangularMesh();
+	void triangularMeshToEdgeFlipTest();
 	void updateTriangularMesh();
 
 private:
@@ -51,6 +54,7 @@ private:
 	enum class EditMode
 	{
 		PLACE_VERTICES = 0,
+		FLIP_EDGE,
 	};
 	
 	EditMode m_EditMode = EditMode::PLACE_VERTICES;
