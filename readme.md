@@ -30,8 +30,6 @@ You can also build the project by opening the root folder on VS Code, and use th
 
 ### Linux
 
-> **_NOTE:_**  Linux target has not been tested yet, but it should work at least on Ubuntu and Fedora.
-
 Install required dependencies:
 ```bash
 sudo apt install libglfw3-dev
