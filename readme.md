@@ -1,5 +1,15 @@
 # TP de Maillages et geometrie algorithmique
 
+## Description
+
+Implementation of Laplacian operator for curvature and heat computation on a 3D mesh.
+Implementation of Delaunay triangulation in 2D (WIP).
+
+## Screenshots
+
+![Curvature](Screenshots/LaplacianCurvatureRender.png)
+![Heat diffusion](Screenshots/HeatDiffusion.png)
+
 ## Building project
 
 ### Windows
