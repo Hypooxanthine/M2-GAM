@@ -32,7 +32,6 @@ private:
 	void onRightClick(int mouseX, int mouseY);
 
 	void resetTriangularMesh();
-	void triangularMeshToEdgeFlipTest();
 	void updateTriangularMesh();
 
 private:

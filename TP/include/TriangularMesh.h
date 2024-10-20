@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Vroom/Asset/AssetData/MeshData.h>
+#include <Vroom/Core/Log.h>
 
 #include <vector>
 #include <unordered_map>
@@ -52,17 +53,26 @@ public:
 public:
     TriangularMesh();
 
+    TriangularMesh(const TriangularMesh& other) = default;
+
+    void clear();
+
     // Adds a vertex and returns its index.
     size_t addVertex(const Vertex& v);
     
     // Adds a face with existing vertex indices and returns the index of the created face.
     size_t addFace(size_t v0, size_t v1, size_t v2);
 
+    size_t addFirstFaceForTriangulation(size_t v0, size_t v1, size_t v2);
+
     void faceSplit(size_t faceIndex, const glm::vec3& vertexPosition);
 
     void edgeFlip(size_t vertexIndex0, size_t vertexIndex1);
 
+    // Finds the nearest edge and performs an edge flip.
     void edgeFlip(const glm::vec3& coords);
+
+    bool isFaceInfinite(size_t faceIndex) const;
 
     size_t getFaceContainingPoint(const glm::vec3& vertexPosition) const;
 
@@ -289,6 +299,9 @@ private:
     std::vector<Face> m_Faces;
 
     std::unordered_map<std::pair<size_t, size_t>, std::pair<size_t, glm::length_t>> m_MetEdges;
+
+    bool m_IsForTriangulation = false;
+    size_t m_InfiniteVertexIndex = 0;
 };
 
 /* Templates implementation */
@@ -357,6 +370,9 @@ vrm::MeshData TriangularMesh::toHeatMeshData(Fn heatFunction, float factor) cons
     {
         for (size_t i = start; i < end; i++)
         {
+            if (isFaceInfinite(i))
+                continue;
+            
             Face f = m_Faces.at(m_Vertices.at(i).faceIndex);
             vrm::Vertex v;
             v.position = m_Vertices.at(i).position;

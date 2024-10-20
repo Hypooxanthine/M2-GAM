@@ -9,10 +9,11 @@
 
 TriangularMesh::TriangularMesh()
 {
-    Vertex infiniteVertex;
-    infiniteVertex.position = { 0.f, 0.f, 0.f };
-    infiniteVertex.faceIndex = 1;
-    m_Vertices.push_back(infiniteVertex);
+}
+
+void TriangularMesh::clear()
+{
+    *this = TriangularMesh();
 }
 
 size_t TriangularMesh::addVertex(const Vertex& v)
@@ -67,6 +68,62 @@ size_t TriangularMesh::addFace(size_t v0, size_t v1, size_t v2)
     m_Faces.push_back(f);
 
     return m_Faces.size() - 1;
+}
+
+size_t TriangularMesh::addFirstFaceForTriangulation(size_t v0, size_t v1, size_t v2)
+{
+    m_Faces.reserve(m_Faces.size() + 4);
+
+    size_t iInf = addVertex(Vertex{ { 0.f, -10000000.f, 0.f }, 0 });
+    Vertex& infiniteVertex = m_Vertices.at(iInf);
+    m_InfiniteVertexIndex = iInf;
+    
+    Face& f = m_Faces.emplace_back();
+    size_t iF = m_Faces.size() - 1;
+        f.i0 = v0;
+        f.i1 = v1;
+        f.i2 = v2;
+
+    Face& fInf0 = m_Faces.emplace_back();
+    size_t iFInf0 = m_Faces.size() - 1;
+        fInf0.i0 = iInf;
+        fInf0.i1 = v1;
+        fInf0.i2 = v0;
+
+    Face& fInf1 = m_Faces.emplace_back();
+    size_t iFInf1 = m_Faces.size() - 1;
+        fInf1.i0 = iInf;
+        fInf1.i1 = v2;
+        fInf1.i2 = v1;
+
+    Face& fInf2 = m_Faces.emplace_back();
+    size_t iFInf2 = m_Faces.size() - 1;
+        fInf2.i0 = iInf;
+        fInf2.i1 = v0;
+        fInf2.i2 = v2;
+
+    f.n0 = iFInf1;
+    f.n1 = iFInf2;
+    f.n2 = iFInf0;
+
+    fInf0.n0 = iF;
+    fInf0.n1 = iFInf2;
+    fInf0.n2 = iFInf1;
+
+    fInf1.n0 = iF;
+    fInf1.n1 = iFInf0;
+    fInf1.n2 = iFInf2;
+
+    fInf2.n0 = iF;
+    fInf2.n1 = iFInf1;
+    fInf2.n2 = iFInf0;
+
+    // First face the infinite vertex is turning around is the first infinite face created
+    infiniteVertex.faceIndex = iFInf0;
+
+    m_IsForTriangulation = true;
+
+    return iF;
 }
 
 void TriangularMesh::faceSplit(size_t faceIndex, const glm::vec3& vertexPosition)
@@ -200,12 +257,29 @@ void TriangularMesh::edgeFlip(const glm::vec3& coords)
     }
 }
 
+bool TriangularMesh::isFaceInfinite(size_t faceIndex) const
+{
+    if (!m_IsForTriangulation)
+        return false;
+        
+    for (auto it = begin_turning_faces(m_InfiniteVertexIndex); it != end_turning_faces(m_InfiniteVertexIndex); ++it)
+    {
+        if (*it == faceIndex)
+            return true;
+    }
+
+    return false;
+}
+
 size_t TriangularMesh::getFaceContainingPoint(const glm::vec3& vertexPosition) const
 {
     glm::vec2 p = glm::vec2(vertexPosition.x, vertexPosition.z);
 
     for (size_t f_i = 0; f_i < m_Faces.size(); f_i++)
     {
+        if (isFaceInfinite(f_i))
+            continue;
+            
         const auto& f = m_Faces.at(f_i);
         bool inside = true;
 
@@ -472,8 +546,13 @@ vrm::MeshData TriangularMesh::toMeshData() const
     vertices.reserve(triangleCount * 3);
     indices.reserve(triangleCount * 3);
 
-    for (const auto& f : m_Faces)
+    for (size_t i = 0; i < m_Faces.size(); i++)
     {
+        if (isFaceInfinite(i))
+            continue;
+
+        const Face& f = m_Faces.at(i);
+
         vrm::Vertex A, B, C;
         A.position = m_Vertices.at(f.i0).position;
         B.position = m_Vertices.at(f.i1).position;
@@ -515,6 +594,9 @@ vrm::MeshData TriangularMesh::toSmoothMeshData() const
 
     for (size_t i = 0; i < m_Vertices.size(); i++)
     {
+        if (isFaceInfinite(m_Vertices.at(i).faceIndex))
+            continue;
+
         Face f = m_Faces.at(m_Vertices.at(i).faceIndex);
         vrm::Vertex v;
         v.position = m_Vertices.at(i).position;
