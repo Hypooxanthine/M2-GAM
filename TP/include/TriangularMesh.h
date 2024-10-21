@@ -9,6 +9,7 @@
 #include <functional>
 #include <type_traits>
 #include <thread>
+#include <optional>
 
 #include <glm/glm.hpp>
 
@@ -74,7 +75,9 @@ public:
 
     bool isFaceInfinite(size_t faceIndex) const;
 
-    size_t getFaceContainingPoint(const glm::vec3& vertexPosition) const;
+    std::optional<size_t> getFaceContainingPoint(const glm::vec3& vertexPosition) const;
+
+    bool canPointSeeEdge(const glm::vec3& point, size_t vertexIndex0, size_t vertexIndex1) const;
 
     void addVertex_StreamingTriangulation(const glm::vec3& vertexPosition);
 
@@ -137,10 +140,14 @@ public: // Iterators
         using reference = size_t&;
         
     public:
-        Circulator_on_faces(const TriangularMesh& mesh, size_t vertexIndex, size_t faceIndex, int count = 0)
+        Circulator_on_faces(const TriangularMesh* mesh, size_t vertexIndex, size_t faceIndex, int count = 0)
             : m_Mesh(mesh), m_VertexIndex(vertexIndex), m_FaceIndex(faceIndex), m_Count(count)
         {
         }
+
+        Circulator_on_faces(const Circulator_on_faces& other) = default;
+
+        Circulator_on_faces& operator=(const Circulator_on_faces& other) = default;
 
         size_t operator*() const
         {
@@ -154,8 +161,8 @@ public: // Iterators
 
         Circulator_on_faces& operator++()
         {
-            m_FaceIndex = m_Mesh.CCWFaceIndex(m_VertexIndex, m_FaceIndex);
-            if (m_FaceIndex == m_Mesh.firstFaceIndex(m_VertexIndex))
+            m_FaceIndex = m_Mesh->CCWFaceIndex(m_VertexIndex, m_FaceIndex);
+            if (m_FaceIndex == m_Mesh->firstFaceIndex(m_VertexIndex))
                 m_Count++;
             return *this;
         }
@@ -169,8 +176,8 @@ public: // Iterators
 
         Circulator_on_faces& operator--()
         {
-            m_FaceIndex = m_Mesh.CWFaceIndex(m_VertexIndex, m_FaceIndex);
-            if (m_FaceIndex == m_Mesh.firstFaceIndex(m_VertexIndex))
+            m_FaceIndex = m_Mesh->CWFaceIndex(m_VertexIndex, m_FaceIndex);
+            if (m_FaceIndex == m_Mesh->firstFaceIndex(m_VertexIndex))
                 m_Count--;
             return *this;
         }
@@ -193,7 +200,7 @@ public: // Iterators
         }
 
     private:
-        const TriangularMesh& m_Mesh;
+        const TriangularMesh* m_Mesh;
         size_t m_VertexIndex;
         size_t m_FaceIndex;
         int m_Count = 0;
@@ -205,22 +212,22 @@ public: // Iterators
         using iterator_category = std::bidirectional_iterator_tag;
         
     public:
-        Circulator_on_vertices(const TriangularMesh& mesh, size_t vertexIndex, int count = 0)
-            : m_Mesh(mesh), m_VertexIndex(vertexIndex), m_Face(mesh, vertexIndex, mesh.firstFaceIndex(vertexIndex), count), m_Count(count)
+        Circulator_on_vertices(const TriangularMesh* mesh, size_t vertexIndex, int count = 0)
+            : m_Mesh(mesh), m_VertexIndex(vertexIndex), m_Face(mesh, vertexIndex, mesh->firstFaceIndex(vertexIndex), count), m_Count(count)
         {
-            m_TurningVertexIndex_local = (m_Mesh.localVertexIndex(m_VertexIndex, *m_Face) + 1) % 3;
+            m_TurningVertexIndex_local = (m_Mesh->localVertexIndex(m_VertexIndex, *m_Face) + 1) % 3;
         }
 
         size_t operator*() const
         {
-            return m_Mesh.getFace(*m_Face).indices[m_TurningVertexIndex_local];
+            return m_Mesh->getFace(*m_Face).indices[m_TurningVertexIndex_local];
         }
 
         Circulator_on_vertices& operator++()
         {
             ++m_Face;
-            m_TurningVertexIndex_local = (m_Mesh.localVertexIndex(m_VertexIndex, *m_Face) + 1) % 3;
-            if (*m_Face == m_Mesh.firstFaceIndex(m_VertexIndex))
+            m_TurningVertexIndex_local = (m_Mesh->localVertexIndex(m_VertexIndex, *m_Face) + 1) % 3;
+            if (*m_Face == m_Mesh->firstFaceIndex(m_VertexIndex))
                 m_Count++;
             return *this;
         }
@@ -235,8 +242,8 @@ public: // Iterators
         Circulator_on_vertices& operator--()
         {
             --m_Face;
-            m_TurningVertexIndex_local = (m_Mesh.localVertexIndex(m_VertexIndex, *m_Face) + 1) % 3;
-            if (*m_Face == m_Mesh.firstFaceIndex(m_VertexIndex))
+            m_TurningVertexIndex_local = (m_Mesh->localVertexIndex(m_VertexIndex, *m_Face) + 1) % 3;
+            if (*m_Face == m_Mesh->firstFaceIndex(m_VertexIndex))
                 m_Count--;
             return *this;
         }
@@ -259,7 +266,7 @@ public: // Iterators
         }
 
     private:
-        const TriangularMesh& m_Mesh;
+        const TriangularMesh* m_Mesh;
         size_t m_VertexIndex;
         Circulator_on_faces m_Face;
         glm::length_t m_TurningVertexIndex_local;
@@ -276,22 +283,22 @@ public: // Iterator access
 
     Circulator_on_faces begin_turning_faces(size_t vertexIndex) const
     {
-        return Circulator_on_faces(*this, vertexIndex, firstFaceIndex(vertexIndex), 0);
+        return Circulator_on_faces(this, vertexIndex, firstFaceIndex(vertexIndex), 0);
     }
     
     Circulator_on_faces end_turning_faces(size_t vertexIndex) const
     {
-        return Circulator_on_faces(*this, vertexIndex, firstFaceIndex(vertexIndex), 1);
+        return Circulator_on_faces(this, vertexIndex, firstFaceIndex(vertexIndex), 1);
     }
 
     Circulator_on_vertices begin_turning_vertices(size_t vertexIndex) const
     {
-        return Circulator_on_vertices(*this, vertexIndex, 0);
+        return Circulator_on_vertices(this, vertexIndex, 0);
     }
 
     Circulator_on_vertices end_turning_vertices(size_t vertexIndex) const
     {
-        return Circulator_on_vertices(*this, vertexIndex, 1);
+        return Circulator_on_vertices(this, vertexIndex, 1);
     }
 
 private:

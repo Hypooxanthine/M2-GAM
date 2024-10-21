@@ -227,9 +227,9 @@ void TriangularMesh::edgeFlip(size_t vertexIndex0, size_t vertexIndex1)
 
 void TriangularMesh::edgeFlip(const glm::vec3& coords)
 {
-    try {
-        auto containingFaceID = getFaceContainingPoint(coords);
-        auto& f = m_Faces.at(containingFaceID);
+    if (auto containingFaceID = getFaceContainingPoint(coords); containingFaceID.has_value())
+    {
+        auto& f = m_Faces.at(containingFaceID.value());
         
         float minDet = std::numeric_limits<float>::max();
         size_t v0 = 0, v1 = 0;
@@ -252,8 +252,10 @@ void TriangularMesh::edgeFlip(const glm::vec3& coords)
         }
 
         edgeFlip(v0, v1);
-    } catch (const std::runtime_error& e) {
-        VRM_LOG_ERROR("Errore while flipping edge: {}", e.what());
+    }
+    else
+    {
+        VRM_LOG_ERROR("Errore while flipping edge.");
     }
 }
 
@@ -271,7 +273,7 @@ bool TriangularMesh::isFaceInfinite(size_t faceIndex) const
     return false;
 }
 
-size_t TriangularMesh::getFaceContainingPoint(const glm::vec3& vertexPosition) const
+std::optional<size_t> TriangularMesh::getFaceContainingPoint(const glm::vec3& vertexPosition) const
 {
     glm::vec2 p = glm::vec2(vertexPosition.x, vertexPosition.z);
 
@@ -304,16 +306,57 @@ size_t TriangularMesh::getFaceContainingPoint(const glm::vec3& vertexPosition) c
             return f_i;
     }
 
-    throw std::runtime_error("No containing face has been found.");
+    return std::nullopt;
+}
+
+bool TriangularMesh::canPointSeeEdge(const glm::vec3& point, size_t vertexIndex0, size_t vertexIndex1) const
+{
+    const auto& v0 = m_Vertices.at(vertexIndex0).position;
+    const auto& v1 = m_Vertices.at(vertexIndex1).position;
+
+    const glm::vec2 A = glm::vec2(v0.x, v0.z);
+    const glm::vec2 B = glm::vec2(v1.x, v1.z);
+    const glm::vec2 P = glm::vec2(point.x, point.z);
+
+    return glm::determinant(glm::mat2(P - A, B - A)) < 0.f;
 }
 
 void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPosition)
 {
-    try {
-        auto containingFaceID = getFaceContainingPoint(vertexPosition);
-        faceSplit(containingFaceID, vertexPosition);
-    } catch (const std::runtime_error& e) {
-        VRM_LOG_ERROR("Error while adding vertex: {}", e.what());
+    if (auto containingFaceID = getFaceContainingPoint(vertexPosition); containingFaceID.has_value())
+    {
+        faceSplit(containingFaceID.value(), vertexPosition);
+        return;
+    }
+
+    // If we couldn't find any face containing the point, we will need to add geometry around convex hull
+
+    bool foundFirst = false;
+    auto first = end_turning_faces(m_InfiniteVertexIndex);
+    
+    for (auto it = begin_turning_faces(m_InfiniteVertexIndex); it != end_turning_faces(m_InfiniteVertexIndex); ++it)
+    {
+        const auto& f = m_Faces.at(*it);
+        auto iInfVertex_local = localVertexIndex(m_InfiniteVertexIndex, *it);
+        
+        if (canPointSeeEdge(vertexPosition, f.indices[(iInfVertex_local + 2) % 3], f.indices[(iInfVertex_local + 1) % 3]))
+        {
+            if (foundFirst)
+            {
+                edgeFlip(
+                    f.indices[(iInfVertex_local + 0) % 3],
+                    f.indices[(iInfVertex_local + 2) % 3]
+                );
+            }
+            else
+            {
+                faceSplit(*it, vertexPosition);
+                foundFirst = true;
+                first = it;
+            }
+        }
+        else if (foundFirst)
+            break;
     }
 }
 
