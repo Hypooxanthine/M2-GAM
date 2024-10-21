@@ -280,7 +280,7 @@ bool TriangularMesh::isFaceInfinite(size_t faceIndex) const
 
 std::optional<size_t> TriangularMesh::getFaceContainingPoint(const glm::vec3& vertexPosition) const
 {
-    glm::vec2 p = glm::vec2(vertexPosition.x, vertexPosition.z);
+    glm::vec2 p = glm::vec2(vertexPosition.x, -vertexPosition.z);
 
     for (size_t f_i = 0; f_i < m_Faces.size(); f_i++)
     {
@@ -295,12 +295,12 @@ std::optional<size_t> TriangularMesh::getFaceContainingPoint(const glm::vec3& ve
             const glm::length_t i_next = (i + 1) % 3;
             const auto& v_i = m_Vertices.at(f.indices[i]);
             const auto& v_i_next = m_Vertices.at(f.indices[i_next]);
-            const glm::vec2 v_i_2D = glm::vec2(v_i.position.x, v_i.position.z);
-            const glm::vec2 v_i_next_2D = glm::vec2(v_i_next.position.x, v_i_next.position.z);
+            const glm::vec2 v_i_2D = glm::vec2(v_i.position.x, -v_i.position.z);
+            const glm::vec2 v_i_next_2D = glm::vec2(v_i_next.position.x, -v_i_next.position.z);
             
             const auto det = glm::determinant(glm::mat2(p - v_i_2D, v_i_next_2D - v_i_2D));
 
-            if (det < 0.f)
+            if (det > 0.f)
             {
                 inside = false;
                 break;
