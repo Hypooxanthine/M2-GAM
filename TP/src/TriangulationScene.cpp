@@ -18,7 +18,7 @@
 #include "RayCasting.h"
 
 TriangulationScene::TriangulationScene()
-    : vrm::Scene(), m_Camera(0.1f, 100.f, glm::radians(90.f), 600.f / 400.f, { 0.f, 10.f, 0.f }, { glm::radians(90.f), 0.f, 0.f })
+    : vrm::Scene(), m_Camera(0.1f, 100.f, glm::radians(90.f), 600.f / 400.f, { 0.f, 20.f, 0.f }, { glm::radians(90.f), 0.f, 0.f })
 {
     auto& gameLayer = vrm::Application::Get().getGameLayer();
 

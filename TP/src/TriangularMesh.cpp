@@ -121,6 +121,11 @@ size_t TriangularMesh::addFirstFaceForTriangulation(size_t v0, size_t v1, size_t
     // First face the infinite vertex is turning around is the first infinite face created
     infiniteVertex.faceIndex = iFInf0;
 
+    // For the vertices of the first face, their first face they will turn around
+    // will be the first face itself
+    for (glm::length_t i = 0; i < 3; i++)
+        m_Vertices.at(f.indices[i]).faceIndex = iF;
+
     m_IsForTriangulation = true;
 
     return iF;
@@ -314,11 +319,11 @@ bool TriangularMesh::canPointSeeEdge(const glm::vec3& point, size_t vertexIndex0
     const auto& v0 = m_Vertices.at(vertexIndex0).position;
     const auto& v1 = m_Vertices.at(vertexIndex1).position;
 
-    const glm::vec2 A = glm::vec2(v0.x, v0.z);
-    const glm::vec2 B = glm::vec2(v1.x, v1.z);
-    const glm::vec2 P = glm::vec2(point.x, point.z);
+    const glm::vec2 A = glm::vec2(v0.x, -v0.z);
+    const glm::vec2 B = glm::vec2(v1.x, -v1.z);
+    const glm::vec2 P = glm::vec2(point.x, -point.z);
 
-    return glm::determinant(glm::mat2(P - A, B - A)) < 0.f;
+    return glm::determinant(glm::mat2(P - A, B - A)) > 0.f;
 }
 
 void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPosition)
@@ -329,10 +334,11 @@ void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPos
         return;
     }
 
-    // If we couldn't find any face containing the point, we will need to add geometry around convex hull
+    // If we couldn't find any face containing the point, we will need to add geometry outside convex hull
 
     bool foundFirst = false;
     auto first = end_turning_faces(m_InfiniteVertexIndex);
+    auto last = end_turning_faces(m_InfiniteVertexIndex);
     
     for (auto it = begin_turning_faces(m_InfiniteVertexIndex); it != end_turning_faces(m_InfiniteVertexIndex); ++it)
     {
@@ -341,22 +347,63 @@ void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPos
         
         if (canPointSeeEdge(vertexPosition, f.indices[(iInfVertex_local + 2) % 3], f.indices[(iInfVertex_local + 1) % 3]))
         {
-            if (foundFirst)
+            if (!foundFirst)
             {
-                edgeFlip(
-                    f.indices[(iInfVertex_local + 0) % 3],
-                    f.indices[(iInfVertex_local + 2) % 3]
-                );
-            }
-            else
-            {
-                faceSplit(*it, vertexPosition);
                 foundFirst = true;
                 first = it;
             }
+
+            last = it;
         }
         else if (foundFirst)
             break;
+    }
+
+    // Now we make sure the first we found is really the first
+    // When iterating, if we started on an edge that is visible by the new point,
+    // we need to check if we can see more edges going clockwise.
+
+    for (auto it = first; ;)
+    {
+        --it;
+        const auto& f = m_Faces.at(*it);
+        auto iInfVertex_local = localVertexIndex(m_InfiniteVertexIndex, *it);
+
+        if (canPointSeeEdge(vertexPosition, f.indices[(iInfVertex_local + 2) % 3], f.indices[(iInfVertex_local + 1) % 3]))
+            --first;
+        else
+            break;
+    }
+
+    // Keeping track of current and next faces because we are changing geometry:
+    auto currentFace = first;
+    auto nextFace = std::next(first, 1);
+
+    // Now we can add the new point.
+    // For the first one, we only split the face:
+    faceSplit(*currentFace, vertexPosition);
+
+    if (first == last)
+        return;
+
+    currentFace = nextFace;
+    ++nextFace;
+
+    // For the other ones, we will flip an infinite edge:
+    for (;;)
+    {
+        auto& f = m_Faces.at(*currentFace);
+        auto iInfVertex_local = localVertexIndex(m_InfiniteVertexIndex, *currentFace);
+        edgeFlip(
+            f.indices[(iInfVertex_local + 0) % 3],
+            f.indices[(iInfVertex_local + 1) % 3]
+        );
+
+        if (currentFace == last)
+            break;
+
+        currentFace = nextFace;
+        ++nextFace;
     }
 }
 
