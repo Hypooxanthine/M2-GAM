@@ -166,6 +166,8 @@ void TriangulationScene::onRightClick(int mouseX, int mouseY)
     {
         VRM_LOG_INFO("Placing vertex at {}", glm::to_string(hit.position));
         m_TriangularMesh.addVertex_StreamingTriangulation(hit.position);
+        m_TriangularMesh.printFacesAroundVertexCCW(3);
+        m_TriangularMesh.integrityTest();
         updateTriangularMesh();
     }
     else if (m_EditMode == EditMode::FLIP_EDGE)

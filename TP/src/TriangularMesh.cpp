@@ -74,9 +74,10 @@ size_t TriangularMesh::addFirstFaceForTriangulation(size_t v0, size_t v1, size_t
 {
     m_Faces.reserve(m_Faces.size() + 4);
 
-    size_t iInf = addVertex(Vertex{ { 0.f, -10000000.f, 0.f }, 0 });
-    Vertex& infiniteVertex = m_Vertices.at(iInf);
+    addVertex(Vertex{ { 0.f, -10000000.f, 0.f }, 0 });
+    size_t iInf = m_Vertices.size() - 1;
     m_InfiniteVertexIndex = iInf;
+    Vertex& infiniteVertex = m_Vertices.at(iInf);
     
     Face& f = m_Faces.emplace_back();
     size_t iF = m_Faces.size() - 1;
@@ -131,51 +132,80 @@ size_t TriangularMesh::addFirstFaceForTriangulation(size_t v0, size_t v1, size_t
     return iF;
 }
 
-void TriangularMesh::faceSplit(size_t faceIndex, const glm::vec3& vertexPosition)
+void TriangularMesh::faceSplit(size_t iF, const glm::vec3& vertexPosition)
 {
-    Face& f = m_Faces.at(faceIndex);
+    auto iv3 = addVertex(Vertex{ vertexPosition, 0});
+    auto& vertex3 = m_Vertices.at(iv3);
 
-    // Adding the vertex to the mesh
-    const auto vertexIndex = m_Vertices.size();
-    // We set its face to the face we are splitting, because this face will stay in the structure and then its index will stil be relevant
-    m_Vertices.push_back(Vertex{ vertexPosition, faceIndex });
-    
-    // Indices of the face before the split
-    const auto indices = f.indices;
-    // Neighbours of the face before the split
-    const auto neighbors = f.neighbours;
+    m_Faces.resize(m_Faces.size() + 2);
 
-    const auto f0 = faceIndex;
-    const auto f1 = m_Faces.size();
-    const auto f2 = f1 + 1;
+    auto& f = m_Faces.at(iF);
+    size_t if3 = m_Faces.size() - 2;
+    size_t if4 = m_Faces.size() - 1;
+    auto& f3 = m_Faces.at(if3);
+    auto& f4 = m_Faces.at(if4);
 
-    // Set the vertex face to the first one
-    m_Vertices.at(vertexIndex).faceIndex = f0;
+    const glm::length_t v0 = 0, v1 = 1, v2 = 2;
 
-    // First face : just change the existing face
-    f.i2 = vertexIndex;
-    f.n0 = f1;
-    f.n1 = f2;
-    f.n2 = neighbors[2]; // Should not change
+    const size_t iv0 = f.indices[v0];
+    const size_t iv1 = f.indices[v1];
+    const size_t iv2 = f.indices[v2];
 
-    // Second face : create a new face
-    Face newFace;
-    newFace.i0 = vertexIndex;
-    newFace.i1 = indices[1];
-    newFace.i2 = indices[2];
-    newFace.n0 = neighbors[0];
-    newFace.n1 = f2;
-    newFace.n2 = f0;
-    m_Faces.push_back(newFace);
+    auto& vertex0 = m_Vertices.at(iv0);
+    auto& vertex1 = m_Vertices.at(iv1);
+    auto& vertex2 = m_Vertices.at(iv2);
 
-    // Third face : create a new face
-    newFace.i0 = indices[0];
-    newFace.i1 = vertexIndex;
-    newFace.i2 = indices[2];
-    newFace.n0 = f1;
-    newFace.n1 = neighbors[1];
-    newFace.n2 = f0;
-    m_Faces.push_back(newFace);
+    const size_t if0 = f.neighbours[v0];
+    const size_t if1 = f.neighbours[v1];
+    const size_t if2 = f.neighbours[v2];
+
+    auto& f0 = m_Faces.at(if0);
+    auto& f1 = m_Faces.at(if1);
+    auto& f2 = m_Faces.at(if2);
+
+    const glm::length_t v00 = (localVertexIndex(iv1, if0) + 1) % 3;
+    const glm::length_t v10 = (localVertexIndex(iv2, if1) + 1) % 3;
+    const glm::length_t v20 = (localVertexIndex(iv0, if2) + 1) % 3;
+
+    // Defining new faces (f3 & f4) vertex indices
+    f3.i0 = iv3;
+    f3.i1 = iv0;
+    f3.i2 = iv1;
+
+    f4.i0 = iv3;
+    f4.i1 = iv1;
+    f4.i2 = iv2;
+
+    // Initial face (f) has a vertex index modified
+    f.indices[v1] = iv3;
+
+    // f0 and f4 are neighbors
+    f0.neighbours[v00] = if4;
+    f4.n0 = if0;
+
+    // f2 and f3 are neighbors
+    f2.neighbours[v20] = if3;
+    f3.n0 = if2;
+
+    // f and f1 were neighbors, and still are: no change
+
+    // f3 and f4 are neighbors
+    f3.n1 = if4;
+    f4.n2 = if3;
+
+    // f4 and f are neighbors
+    f4.n1 = iF;
+    f.neighbours[v0] = if4;
+
+    // f and f3 are neighbors
+    f.neighbours[v2] = if3;
+    f3.n2 = iF;
+
+    // Modiying the first face each vertex is turning around
+    vertex0.faceIndex = if2;
+    vertex1.faceIndex = if0;
+    vertex2.faceIndex = if1;
+    vertex3.faceIndex = iF;
 }
 
 void TriangularMesh::edgeFlip(size_t vertexIndex0, size_t vertexIndex1)
@@ -189,6 +219,7 @@ void TriangularMesh::edgeFlip(size_t vertexIndex0, size_t vertexIndex1)
     bool found = false;
     for (auto it = begin_turning_faces(vertexIndex0); it != end_turning_faces(vertexIndex0); ++it)
     {
+        VRM_LOG_TRACE("Turning around vertex {}. Face: {}. First face was: {}", vertexIndex0, *it, firstFaceIndex(vertexIndex0));
         if0 = if1;
         if1 = *it;
         const auto& f1 = m_Faces.at(if1);
@@ -370,20 +401,26 @@ void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPos
         auto iInfVertex_local = localVertexIndex(m_InfiniteVertexIndex, *it);
 
         if (canPointSeeEdge(vertexPosition, f.indices[(iInfVertex_local + 2) % 3], f.indices[(iInfVertex_local + 1) % 3]))
-            --first;
+        {
+            first = it;
+        }
         else
             break;
     }
+
+    VRM_LOG_TRACE("First: {}, last: {}", *first, *last);
 
     // Keeping track of current and next faces because we are changing geometry:
     auto currentFace = first;
     auto nextFace = std::next(first, 1);
 
+    VRM_LOG_TRACE("Current: {}, next: {}, last: {}", *currentFace, *nextFace, *last);
+
     // Now we can add the new point.
     // For the first one, we only split the face:
     faceSplit(*currentFace, vertexPosition);
 
-    if (first == last)
+    if (*first == *last)
         return;
 
     currentFace = nextFace;
@@ -392,6 +429,7 @@ void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPos
     // For the other ones, we will flip an infinite edge:
     for (;;)
     {
+        VRM_LOG_TRACE("Current: {}, next: {}, last: {}", *currentFace, *nextFace, *last);
         auto& f = m_Faces.at(*currentFace);
         auto iInfVertex_local = localVertexIndex(m_InfiniteVertexIndex, *currentFace);
         edgeFlip(
@@ -399,7 +437,7 @@ void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPos
             f.indices[(iInfVertex_local + 1) % 3]
         );
 
-        if (currentFace == last)
+        if (*currentFace == *last)
             break;
 
         currentFace = nextFace;
@@ -491,6 +529,8 @@ void TriangularMesh::printFaces() const
 
 void TriangularMesh::printFacesAroundVertexCCW(size_t vertexIndex) const
 {
+    VRM_LOG_INFO("Faces around vertex {}:", vertexIndex);
+
     size_t f = firstFaceIndex(vertexIndex);
     size_t f0 = f;
 
@@ -530,10 +570,13 @@ void TriangularMesh::integrityTest() const
     {
         const auto& f = m_Faces.at(i);
         
-        // Check if aff vertices exist
+        // Check if all vertices exist
         VRM_ASSERT(f.i0 < m_Vertices.size());
         VRM_ASSERT(f.i1 < m_Vertices.size());
         VRM_ASSERT(f.i2 < m_Vertices.size());
+        VRM_ASSERT(f.n0 < m_Faces.size());
+        VRM_ASSERT(f.n1 < m_Faces.size());
+        VRM_ASSERT(f.n2 < m_Faces.size());
 
         // Check if all neighbours have f as neighbour
 
@@ -541,10 +584,8 @@ void TriangularMesh::integrityTest() const
         VRM_ASSERT(nf0.n0 == i || nf0.n1 == i || nf0.n2 == i);
         auto& nf1 = m_Faces.at(f.n1);
         VRM_ASSERT(nf1.n0 == i || nf1.n1 == i || nf1.n2 == i);
-        auto& nf2 = m_Faces.at(f.n0);
+        auto& nf2 = m_Faces.at(f.n2);
         VRM_ASSERT(nf2.n0 == i || nf2.n1 == i || nf2.n2 == i);
-
-        i++;
     }
 }
 
