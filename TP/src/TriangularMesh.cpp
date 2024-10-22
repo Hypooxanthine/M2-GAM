@@ -137,13 +137,13 @@ void TriangularMesh::faceSplit(size_t iF, const glm::vec3& vertexPosition)
     auto iv3 = addVertex(Vertex{ vertexPosition, 0});
     auto& vertex3 = m_Vertices.at(iv3);
 
-    m_Faces.resize(m_Faces.size() + 2);
+    m_Faces.reserve(m_Faces.size() + 2);
 
     auto& f = m_Faces.at(iF);
-    size_t if3 = m_Faces.size() - 2;
-    size_t if4 = m_Faces.size() - 1;
-    auto& f3 = m_Faces.at(if3);
-    auto& f4 = m_Faces.at(if4);
+    size_t if3 = m_Faces.size();
+    auto& f3 = m_Faces.emplace_back();
+    size_t if4 = m_Faces.size();
+    auto& f4 = m_Faces.emplace_back();
 
     const glm::length_t v0 = 0, v1 = 1, v2 = 2;
 
@@ -219,7 +219,6 @@ void TriangularMesh::edgeFlip(size_t vertexIndex0, size_t vertexIndex1)
     bool found = false;
     for (auto it = begin_turning_faces(vertexIndex0); it != end_turning_faces(vertexIndex0); ++it)
     {
-        VRM_LOG_TRACE("Turning around vertex {}. Face: {}. First face was: {}", vertexIndex0, *it, firstFaceIndex(vertexIndex0));
         if0 = if1;
         if1 = *it;
         const auto& f1 = m_Faces.at(if1);
@@ -235,8 +234,9 @@ void TriangularMesh::edgeFlip(size_t vertexIndex0, size_t vertexIndex1)
         }
     }
 
+    if (!found)
+        printFacesAroundVertexCCW(vertexIndex0);
     VRM_ASSERT_MSG(found, "Edge not found.");
-    VRM_LOG_TRACE("Faces found : {} and {}", if0, if1);
 
     auto& f0 = m_Faces.at(if0);
     auto& f1 = m_Faces.at(if1);
@@ -259,6 +259,10 @@ void TriangularMesh::edgeFlip(size_t vertexIndex0, size_t vertexIndex1)
     f1.neighbours[(v10 + 0) % 3] = ifp0;
     fp0.neighbours[(vp00 + 2) % 3] = if1;
     f1.neighbours[(v10 + 1) % 3] = if0;
+
+    // New first faces
+    m_Vertices.at(vertexIndex0).faceIndex = if1;
+    m_Vertices.at(vertexIndex1).faceIndex = if0;
 }
 
 void TriangularMesh::edgeFlip(const glm::vec3& coords)
@@ -408,13 +412,9 @@ void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPos
             break;
     }
 
-    VRM_LOG_TRACE("First: {}, last: {}", *first, *last);
-
     // Keeping track of current and next faces because we are changing geometry:
     auto currentFace = first;
     auto nextFace = std::next(first, 1);
-
-    VRM_LOG_TRACE("Current: {}, next: {}, last: {}", *currentFace, *nextFace, *last);
 
     // Now we can add the new point.
     // For the first one, we only split the face:
@@ -429,7 +429,6 @@ void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPos
     // For the other ones, we will flip an infinite edge:
     for (;;)
     {
-        VRM_LOG_TRACE("Current: {}, next: {}, last: {}", *currentFace, *nextFace, *last);
         auto& f = m_Faces.at(*currentFace);
         auto iInfVertex_local = localVertexIndex(m_InfiniteVertexIndex, *currentFace);
         edgeFlip(
@@ -563,9 +562,7 @@ void TriangularMesh::printFacesAroundVertexCW(size_t vertexIndex) const
 
 void TriangularMesh::integrityTest() const
 {
-    // Test in faces
-
-    
+    // Test in faces    
     for (size_t i = 0; i < m_Faces.size(); i++)
     {
         const auto& f = m_Faces.at(i);
@@ -587,6 +584,17 @@ void TriangularMesh::integrityTest() const
         auto& nf2 = m_Faces.at(f.n2);
         VRM_ASSERT(nf2.n0 == i || nf2.n1 == i || nf2.n2 == i);
     }
+
+    // Vertices: test if each vertex starts on a face containing the vertex
+    for (size_t i = 0; i < m_Vertices.size(); i++)
+    {
+        auto& v = m_Vertices.at(i);
+        auto& f = m_Faces.at(v.faceIndex);
+
+        VRM_ASSERT(f.i0 == i || f.i1 == i || f.i2 == i);
+    }
+
+    VRM_LOG_INFO("Integrity test success.");
 }
 
 void TriangularMesh::loadOFF(const std::string& path)
