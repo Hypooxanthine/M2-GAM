@@ -444,6 +444,16 @@ void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPos
     }
 }
 
+void TriangularMesh::addVertex_StreamingDelaunayTriangulation(const glm::vec3& vertexPosition)
+{
+
+}
+
+void TriangularMesh::delaunayAlgorithm()
+{
+    
+}
+
 size_t TriangularMesh::getVertexCount() const
 {
     return m_Vertices.size();

@@ -81,6 +81,10 @@ public:
 
     void addVertex_StreamingTriangulation(const glm::vec3& vertexPosition);
 
+    void addVertex_StreamingDelaunayTriangulation(const glm::vec3& vertexPosition);
+
+    void delaunayAlgorithm();
+
     size_t getVertexCount() const;
 
     size_t getFaceCount() const;

@@ -48,6 +48,7 @@ private:
 	vrm::MeshAsset m_TriangularMeshAsset;
 	TriangularMesh m_TriangularMesh;
 	bool m_WireFrame = true;
+	bool m_IntegrityTestWhenUpdating = true;
 
 	std::string m_EditModeLabel = "Place vertices";
 	enum class EditMode
@@ -58,4 +59,14 @@ private:
 	
 	EditMode m_EditMode = EditMode::PLACE_VERTICES;
 
+	std::string m_TriangulationModeLabel = "Naive";
+	enum class TriangulationMode
+	{
+		NAIVE = 0,
+		CONTINUOUS_DELAUNAY
+	};
+
+	TriangulationMode m_TriangulationMode = TriangulationMode::NAIVE;
+
+	float m_LastProcessTime = 0.f;
 };

@@ -17,6 +17,8 @@
 
 #include "RayCasting.h"
 
+#include "ScopeProfiler.h"
+
 TriangulationScene::TriangulationScene()
     : vrm::Scene(), m_Camera(0.1f, 100.f, glm::radians(90.f), 600.f / 400.f, { 0.f, 20.f, 0.f }, { glm::radians(90.f), 0.f, 0.f })
 {
@@ -118,6 +120,7 @@ void TriangulationScene::onImGui()
         ImGui::TextWrapped("While left clicking:");
         ImGui::TextWrapped("WASD to move the camera");
         ImGui::TextWrapped("Space to move up, Left Shift to move down");
+        ImGui::TextWrapped("Right click to interact with the scene.");
         ImGui::Checkbox("Enable controls", &m_ControlsEnabled);
         ImGui::TextWrapped("Camera speed");
         ImGui::SliderFloat("##Camera speed", &myCameraSpeed, 0.f, 100.f);
@@ -128,27 +131,65 @@ void TriangulationScene::onImGui()
     ImGui::Begin("Tweaks");
         if (ImGui::Checkbox("Wireframe", &m_WireFrame))
             getEntity("TriangularMesh").getComponent<vrm::MeshComponent>().setWireframe(m_WireFrame);
-        if (ImGui::BeginCombo("Edit mode", m_EditModeLabel.c_str()))
+
+        ImGui::Checkbox("Check mesh integrity when updating", &m_IntegrityTestWhenUpdating);
+
+        if (ImGui::BeginCombo("Triangulation mode", m_TriangulationModeLabel.c_str()))
         {
-            if (ImGui::Selectable("Place vertices"))
+            if (ImGui::Selectable("Naive") && m_TriangulationMode != TriangulationMode::NAIVE)
             {
-                m_EditModeLabel = "Place vertices";
-                m_EditMode = EditMode::PLACE_VERTICES;
+                m_TriangulationModeLabel = "Naive";
+                m_TriangulationMode = TriangulationMode::NAIVE;
+                resetTriangularMesh();
             }
-            else if (ImGui::Selectable("Flip edge"))
+            if (ImGui::Selectable("Continuous Delaunay") && m_TriangulationMode != TriangulationMode::CONTINUOUS_DELAUNAY)
             {
-                m_EditModeLabel = "Flip edge";
-                m_EditMode = EditMode::FLIP_EDGE;
+                m_TriangulationModeLabel = "Continuous Delaunay";
+                m_TriangulationMode = TriangulationMode::CONTINUOUS_DELAUNAY;
+                resetTriangularMesh();
             }
 
             ImGui::EndCombo();
         }
+
+        if (m_TriangulationMode == TriangulationMode::NAIVE)
+        {
+            if (ImGui::BeginCombo("Edit mode", m_EditModeLabel.c_str()))
+            {
+                if (ImGui::Selectable("Place vertices") && m_EditMode != EditMode::PLACE_VERTICES)
+                {
+                    m_EditModeLabel = "Place vertices";
+                    m_EditMode = EditMode::PLACE_VERTICES;
+                }
+                if (ImGui::Selectable("Flip edge") && m_EditMode != EditMode::FLIP_EDGE)
+                {
+                    m_EditModeLabel = "Flip edge";
+                    m_EditMode = EditMode::FLIP_EDGE;
+                }
+
+                ImGui::EndCombo();
+            }
+        }
+
+        // In naive mode, we let the possibility of transforming the triangulation into a Delaunay
+        // triangulation. We do not do it in continuous Delaunay because the mesh
+        // is suppose to stay Delaunay while adding vertices.
+        if (m_TriangulationMode == TriangulationMode::NAIVE && ImGui::Button("Delaunay algorithm"))
+        {
+            m_TriangularMesh.delaunayAlgorithm();
+            updateTriangularMesh();
+        }
+
+        if (ImGui::Button("Integrity test"))
+            m_TriangularMesh.integrityTest();
+
         if (ImGui::Button("Reset"))
             resetTriangularMesh();
     ImGui::End();
 
     ImGui::Begin("Stats");
         ImGui::TextWrapped("FPS: %.2f", ImGui::GetIO().Framerate);
+        ImGui::TextWrapped("Last process time: %.6f s", m_LastProcessTime);
     ImGui::End();
 }
 
@@ -162,17 +203,36 @@ void TriangulationScene::onRightClick(int mouseX, int mouseY)
 
     if (!hit.hasHit) return;
 
-    if (m_EditMode == EditMode::PLACE_VERTICES)
+    if (m_TriangulationMode == TriangulationMode::NAIVE)
+    {
+        if (m_EditMode == EditMode::PLACE_VERTICES)
+        {
+            VRM_LOG_INFO("Placing vertex at {}", glm::to_string(hit.position));
+            {
+                PROFILE_SCOPE_VARIABLE(m_LastProcessTime);
+                m_TriangularMesh.addVertex_StreamingTriangulation(hit.position);
+            }
+            updateTriangularMesh();
+        }
+        else if (m_EditMode == EditMode::FLIP_EDGE)
+        {
+            {
+                PROFILE_SCOPE_VARIABLE(m_LastProcessTime);
+                m_TriangularMesh.edgeFlip(glm::vec3(hit.position.x, 0.f, hit.position.z));
+            }
+            updateTriangularMesh();
+        }
+    }
+    else if (m_TriangulationMode == TriangulationMode::CONTINUOUS_DELAUNAY)
     {
         VRM_LOG_INFO("Placing vertex at {}", glm::to_string(hit.position));
-        m_TriangularMesh.addVertex_StreamingTriangulation(hit.position);
+        {
+            PROFILE_SCOPE_VARIABLE(m_LastProcessTime);
+            m_TriangularMesh.addVertex_StreamingDelaunayTriangulation(hit.position);
+        }
         updateTriangularMesh();
     }
-    else if (m_EditMode == EditMode::FLIP_EDGE)
-    {        
-        m_TriangularMesh.edgeFlip(glm::vec3(hit.position.x, 0.f, hit.position.z));
-        updateTriangularMesh();
-    }
+
 }
 
 void TriangulationScene::resetTriangularMesh()
@@ -187,7 +247,8 @@ void TriangulationScene::resetTriangularMesh()
 
 void TriangulationScene::updateTriangularMesh()
 {
-    m_TriangularMesh.integrityTest();
+    if (m_IntegrityTestWhenUpdating)
+        m_TriangularMesh.integrityTest();
 
     auto data = m_TriangularMesh.toMeshData();
     m_TriangularMeshAsset.clear();
