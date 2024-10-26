@@ -189,7 +189,10 @@ void TriangulationScene::onImGui()
 
     ImGui::Begin("Stats");
         ImGui::TextWrapped("FPS: %.2f", ImGui::GetIO().Framerate);
-        ImGui::TextWrapped("Last process time: %.6f s", m_LastProcessTime);
+        if (m_LastProcessTime >= 0.f)
+            ImGui::TextWrapped("Last process time: %.6f s", m_LastProcessTime);
+        if (m_LastFlipsCount >= 0)
+            ImGui::TextWrapped("Last flips count: %d", m_LastFlipsCount);
     ImGui::End();
 }
 
@@ -228,7 +231,7 @@ void TriangulationScene::onRightClick(int mouseX, int mouseY)
         VRM_LOG_INFO("Placing vertex at {}", glm::to_string(hit.position));
         {
             PROFILE_SCOPE_VARIABLE(m_LastProcessTime);
-            m_TriangularMesh.addVertex_StreamingDelaunayTriangulation(hit.position);
+            m_LastFlipsCount = m_TriangularMesh.addVertex_StreamingDelaunayTriangulation(hit.position);
         }
         updateTriangularMesh();
     }
@@ -242,6 +245,8 @@ void TriangulationScene::resetTriangularMesh()
     size_t v1 = m_TriangularMesh.addVertex({ {  0.f, 0.f, 5.f } });
     size_t v2 = m_TriangularMesh.addVertex({ {  5.f, 0.f, 0.f } });
     m_TriangularMesh.addFirstFaceForTriangulation(v0, v1, v2);
+    m_LastFlipsCount = -1;
+    m_LastProcessTime = -1.f;
     updateTriangularMesh();
 }
 

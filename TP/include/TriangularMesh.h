@@ -105,11 +105,11 @@ public:
 
     bool isEdgeDelaunay(const Edge& edge) const;
 
-    void addVertex_StreamingDelaunayTriangulation(const glm::vec3& vertexPosition, bool printFlipsCount = true);
+    int addVertex_StreamingDelaunayTriangulation(const glm::vec3& vertexPosition);
 
-    void delaunayAlgorithm(std::deque<Edge>& checkList, bool printFlipsCount);
+    int delaunayAlgorithm(std::deque<Edge>& checkList);
 
-    void delaunayAlgorithm(bool printFlipsCount = true);
+    int delaunayAlgorithm();
 
     size_t getVertexCount() const;
 

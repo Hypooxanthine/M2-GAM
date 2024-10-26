@@ -68,5 +68,6 @@ private:
 
 	TriangulationMode m_TriangulationMode = TriangulationMode::CONTINUOUS_DELAUNAY;
 
-	float m_LastProcessTime = 0.f;
+	float m_LastProcessTime = -1.f;
+	int m_LastFlipsCount = -1;
 };

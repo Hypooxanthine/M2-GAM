@@ -477,7 +477,7 @@ bool TriangularMesh::isEdgeDelaunay(const Edge& edge) const
     return glm::determinant(glm::mat3(B - A, C - A, D - A)) < 0.f;
 }
 
-void TriangularMesh::addVertex_StreamingDelaunayTriangulation(const glm::vec3& vertexPosition, bool printFlipsCount)
+int TriangularMesh::addVertex_StreamingDelaunayTriangulation(const glm::vec3& vertexPosition)
 {
     size_t vertexIndex = addVertex_StreamingTriangulation(vertexPosition);
 
@@ -515,13 +515,13 @@ void TriangularMesh::addVertex_StreamingDelaunayTriangulation(const glm::vec3& v
             e.t1 = *it;
     }
 
-    delaunayAlgorithm(checkList, printFlipsCount);
+    return delaunayAlgorithm(checkList);
 }
 
-void TriangularMesh::delaunayAlgorithm(std::deque<Edge>& checkList, bool printFlipsCount)
+int TriangularMesh::delaunayAlgorithm(std::deque<Edge>& checkList)
 {
     size_t justInCase = 1'000;
-    size_t flipsCount = 0;
+    int flipsCount = 0;
 
     while (!checkList.empty() && justInCase != 0)
     {
@@ -540,13 +540,12 @@ void TriangularMesh::delaunayAlgorithm(std::deque<Edge>& checkList, bool printFl
 
     VRM_ASSERT_MSG(justInCase > 0, "Too many flips were made when adding a vertex to the triangulation while keeping Delaunay property.");
 
-    if (printFlipsCount)
-        VRM_LOG_INFO("Flips count: {}.", flipsCount);
+    return flipsCount;
 }
 
-void TriangularMesh::delaunayAlgorithm(bool printFlipsCount)
+int TriangularMesh::delaunayAlgorithm()
 {
-
+    return -1;
 }
 
 size_t TriangularMesh::getVertexCount() const
