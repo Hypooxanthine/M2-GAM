@@ -59,14 +59,14 @@ private:
 	
 	EditMode m_EditMode = EditMode::PLACE_VERTICES;
 
-	std::string m_TriangulationModeLabel = "Naive";
+	std::string m_TriangulationModeLabel = "Continuous Delaunay";
 	enum class TriangulationMode
 	{
 		NAIVE = 0,
 		CONTINUOUS_DELAUNAY
 	};
 
-	TriangulationMode m_TriangulationMode = TriangulationMode::NAIVE;
+	TriangulationMode m_TriangulationMode = TriangulationMode::CONTINUOUS_DELAUNAY;
 
 	float m_LastProcessTime = 0.f;
 };

@@ -208,7 +208,7 @@ void TriangularMesh::faceSplit(size_t iF, const glm::vec3& vertexPosition)
     vertex3.faceIndex = iF;
 }
 
-void TriangularMesh::edgeFlip(size_t vertexIndex0, size_t vertexIndex1)
+TriangularMesh::Edge TriangularMesh::edgeFlip(size_t vertexIndex0, size_t vertexIndex1)
 {
     VRM_LOG_TRACE("Flipping edge between vertices {} and {}", vertexIndex0, vertexIndex1);
 
@@ -263,6 +263,13 @@ void TriangularMesh::edgeFlip(size_t vertexIndex0, size_t vertexIndex1)
     // New first faces
     m_Vertices.at(vertexIndex0).faceIndex = if1;
     m_Vertices.at(vertexIndex1).faceIndex = if0;
+
+    return Edge{
+        .e0 = iv11,
+        .e1 = iv00,
+        .t0 = if1,
+        .t1 = if0
+    };
 }
 
 void TriangularMesh::edgeFlip(const glm::vec3& coords)
@@ -361,12 +368,12 @@ bool TriangularMesh::canPointSeeEdge(const glm::vec3& point, size_t vertexIndex0
     return glm::determinant(glm::mat2(P - A, B - A)) > 0.f;
 }
 
-void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPosition)
+size_t TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPosition)
 {
     if (auto containingFaceID = getFaceContainingPoint(vertexPosition); containingFaceID.has_value())
     {
         faceSplit(containingFaceID.value(), vertexPosition);
-        return;
+        return m_Vertices.size() - 1;
     }
 
     // If we couldn't find any face containing the point, we will need to add geometry outside convex hull
@@ -421,7 +428,7 @@ void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPos
     faceSplit(*currentFace, vertexPosition);
 
     if (*first == *last)
-        return;
+        return m_Vertices.size() - 1;
 
     currentFace = nextFace;
     ++nextFace;
@@ -442,16 +449,104 @@ void TriangularMesh::addVertex_StreamingTriangulation(const glm::vec3& vertexPos
         currentFace = nextFace;
         ++nextFace;
     }
+
+    return m_Vertices.size() - 1;
 }
 
-void TriangularMesh::addVertex_StreamingDelaunayTriangulation(const glm::vec3& vertexPosition)
+bool TriangularMesh::isEdgeDelaunay(const Edge& edge) const
 {
+    // Paraboloid method
+    const auto& t0 = m_Faces.at(edge.t0);
+    const auto& t1 = m_Faces.at(edge.t1);
+    auto A = m_Vertices.at(edge.e1).position;
+    auto B = m_Vertices.at(edge.e0).position;
+    auto C = m_Vertices.at(t0.indices[(localVertexIndex(edge.e0, edge.t0) + 1) % 3]).position;
+    auto D = m_Vertices.at(t1.indices[(localVertexIndex(edge.e1, edge.t1) + 1) % 3]).position;
 
+    // Lifting triangle t0 on the paraboloid
+    A.y = std::powf(A.x, 2.f) + std::powf(A.z, 2.f);
+    A.z = -A.z;
+    B.y = std::powf(B.x, 2.f) + std::powf(B.z, 2.f);
+    B.z = -B.z;
+    C.y = std::powf(C.x, 2.f) + std::powf(C.z, 2.f);
+    C.z = -C.z;
+    D.y = std::powf(D.x, 2.f) + std::powf(D.z, 2.f);
+    D.z = -D.z;
+
+    // D has to be under the plane (ABC) to be inside the circonscribed triangle
+    return glm::determinant(glm::mat3(B - A, C - A, D - A)) < 0.f;
 }
 
-void TriangularMesh::delaunayAlgorithm()
+void TriangularMesh::addVertex_StreamingDelaunayTriangulation(const glm::vec3& vertexPosition, bool printFlipsCount)
 {
-    
+    size_t vertexIndex = addVertex_StreamingTriangulation(vertexPosition);
+
+    // Edges to check
+    std::deque<Edge> checkList;
+
+    for (auto it = begin_turning_faces(vertexIndex); it != end_turning_faces(vertexIndex); ++it)
+    {
+        VRM_LOG_TRACE("Face: {}", *it);
+        if (isFaceInfinite(*it))
+            continue;
+
+        const auto& f = m_Faces.at(*it);
+        auto iv_local = localVertexIndex(vertexIndex, *it);
+        auto i_opp = f.neighbours[iv_local];
+
+        if (!isFaceInfinite(i_opp))
+        {
+            Edge& e = checkList.emplace_back();
+                e.e0 = f.indices[(iv_local + 1) % 3];
+                e.e1 = f.indices[(iv_local + 2) % 3];
+                e.t0 = i_opp;
+                e.t1 = *it;
+        }
+
+        auto nextIt = std::next(it, 1);
+
+        if (isFaceInfinite(*nextIt))
+            continue;
+
+        Edge& e = checkList.emplace_back();
+            e.e0 = f.indices[(iv_local + 2) % 3];
+            e.e1 = f.indices[iv_local];
+            e.t0 = *nextIt;
+            e.t1 = *it;
+    }
+
+    delaunayAlgorithm(checkList, printFlipsCount);
+}
+
+void TriangularMesh::delaunayAlgorithm(std::deque<Edge>& checkList, bool printFlipsCount)
+{
+    size_t justInCase = 1'000;
+    size_t flipsCount = 0;
+
+    while (!checkList.empty() && justInCase != 0)
+    {
+        auto& e = checkList.front();
+
+        if (!isEdgeDelaunay(e))
+        {
+            checkList.emplace_back(edgeFlip(e.e0, e.e1));
+            ++flipsCount;
+        }
+
+        checkList.pop_front();
+
+        --justInCase;
+    }
+
+    VRM_ASSERT_MSG(justInCase > 0, "Too many flips were made when adding a vertex to the triangulation while keeping Delaunay property.");
+
+    if (printFlipsCount)
+        VRM_LOG_INFO("Flips count: {}.", flipsCount);
+}
+
+void TriangularMesh::delaunayAlgorithm(bool printFlipsCount)
+{
+
 }
 
 size_t TriangularMesh::getVertexCount() const

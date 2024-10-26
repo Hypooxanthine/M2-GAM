@@ -10,6 +10,7 @@
 #include <type_traits>
 #include <thread>
 #include <optional>
+#include <deque>
 
 #include <glm/glm.hpp>
 
@@ -51,6 +52,27 @@ public:
             glm::vec<3, size_t> neighbours;
         };
     };
+
+    /**
+     * Layout:
+     *        e0
+     *      / |  \
+     *     /  |   \
+     *    /   |    \
+     *   v  t0 | t1 v
+     *    \   |    /
+     *     \  |   /
+     *      \ |  /
+     *        e1
+     * 
+     */
+    struct Edge
+    {
+        // Edge indices
+        size_t e0, e1;
+        // Triangle indices
+        size_t t0, t1;
+    };
 public:
     TriangularMesh();
 
@@ -68,7 +90,7 @@ public:
 
     void faceSplit(size_t faceIndex, const glm::vec3& vertexPosition);
 
-    void edgeFlip(size_t vertexIndex0, size_t vertexIndex1);
+    Edge edgeFlip(size_t vertexIndex0, size_t vertexIndex1);
 
     // Finds the nearest edge and performs an edge flip.
     void edgeFlip(const glm::vec3& coords);
@@ -79,11 +101,15 @@ public:
 
     bool canPointSeeEdge(const glm::vec3& point, size_t vertexIndex0, size_t vertexIndex1) const;
 
-    void addVertex_StreamingTriangulation(const glm::vec3& vertexPosition);
+    size_t addVertex_StreamingTriangulation(const glm::vec3& vertexPosition);
 
-    void addVertex_StreamingDelaunayTriangulation(const glm::vec3& vertexPosition);
+    bool isEdgeDelaunay(const Edge& edge) const;
 
-    void delaunayAlgorithm();
+    void addVertex_StreamingDelaunayTriangulation(const glm::vec3& vertexPosition, bool printFlipsCount = true);
+
+    void delaunayAlgorithm(std::deque<Edge>& checkList, bool printFlipsCount);
+
+    void delaunayAlgorithm(bool printFlipsCount = true);
 
     size_t getVertexCount() const;
 
