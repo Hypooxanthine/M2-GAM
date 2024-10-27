@@ -117,6 +117,8 @@ public:
 
     inline const Vertex& getVertex(size_t index) const { return m_Vertices.at(index); }
 
+    inline Vertex& getVertex(size_t index) { return m_Vertices.at(index); }
+
     inline const Face& getFace(size_t index) const { return m_Faces.at(index); }
 
     glm::length_t localVertexIndex(size_t globalVertexIndex, size_t faceIndex) const;

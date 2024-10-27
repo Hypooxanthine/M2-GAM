@@ -7,6 +7,7 @@
 #include <glm/gtc/constants.hpp>
 
 #include <vector>
+#include <filesystem>
 
 #include "imgui.h"
 #include "TriangularMesh.h"
@@ -31,6 +32,12 @@ private:
 
 	void onRightClick(int mouseX, int mouseY);
 
+	void naiveTriangulation(const std::filesystem::path& data);
+	void delaunayTriangulation(const std::filesystem::path& data);
+
+	unsigned long long setupTriangulation(std::ifstream& ifs);
+	void fixHeights(std::ifstream& ifs);
+
 	void resetTriangularMesh();
 	void updateTriangularMesh();
 
@@ -50,6 +57,16 @@ private:
 	bool m_WireFrame = true;
 	bool m_IntegrityTestWhenUpdating = true;
 
+	std::string m_TriangulationModeLabel = "Continuous Delaunay";
+	enum class TriangulationMode
+	{
+		NAIVE = 0,
+		CONTINUOUS_DELAUNAY,
+		TERRAIN
+	};
+
+	TriangulationMode m_TriangulationMode = TriangulationMode::CONTINUOUS_DELAUNAY;
+
 	std::string m_EditModeLabel = "Place vertices";
 	enum class EditMode
 	{
@@ -59,14 +76,8 @@ private:
 	
 	EditMode m_EditMode = EditMode::PLACE_VERTICES;
 
-	std::string m_TriangulationModeLabel = "Continuous Delaunay";
-	enum class TriangulationMode
-	{
-		NAIVE = 0,
-		CONTINUOUS_DELAUNAY
-	};
-
-	TriangulationMode m_TriangulationMode = TriangulationMode::CONTINUOUS_DELAUNAY;
+	std::string m_TerrainDataLabel = "";
+	std::filesystem::path m_TerrainDataPath;
 
 	float m_LastProcessTime = -1.f;
 	int m_LastFlipsCount = -1;

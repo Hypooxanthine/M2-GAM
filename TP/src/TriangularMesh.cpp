@@ -25,9 +25,6 @@ size_t TriangularMesh::addVertex(const Vertex& v)
 
 size_t TriangularMesh::addFace(size_t v0, size_t v1, size_t v2)
 {
-    // Incrementing the indices because of the infinite vertex
-    // and we don't want user to bother with it
-    v0++; v1++; v2++;
     VRM_ASSERT(v0 < m_Vertices.size());
     VRM_ASSERT(v1 < m_Vertices.size());
     VRM_ASSERT(v2 < m_Vertices.size());
@@ -211,7 +208,7 @@ void TriangularMesh::faceSplit(size_t iF, const glm::vec3& vertexPosition)
 
 TriangularMesh::Edge TriangularMesh::edgeFlip(size_t vertexIndex0, size_t vertexIndex1)
 {
-    VRM_LOG_TRACE("Flipping edge between vertices {} and {}", vertexIndex0, vertexIndex1);
+    //VRM_LOG_TRACE("Flipping edge between vertices {} and {}", vertexIndex0, vertexIndex1);
 
     // Searching for incident faces
     size_t if0 = 0, if1 = CWFaceIndex(vertexIndex0, firstFaceIndex(vertexIndex0));
@@ -487,7 +484,6 @@ int TriangularMesh::addVertex_StreamingDelaunayTriangulation(const glm::vec3& ve
 
     for (auto it = begin_turning_faces(vertexIndex); it != end_turning_faces(vertexIndex); ++it)
     {
-        VRM_LOG_TRACE("Face: {}", *it);
         if (isFaceInfinite(*it))
             continue;
 
@@ -524,20 +520,81 @@ int TriangularMesh::delaunayAlgorithm(std::deque<Edge>& checkList)
     size_t justInCase = 1'000;
     int flipsCount = 0;
 
-    while (!checkList.empty() && justInCase != 0)
+    for ( ; !checkList.empty() && justInCase != 0; --justInCase)
     {
-        auto& e = checkList.front();
-
-        if (!isEdgeDelaunay(e))
-        {
-            // @todo There are more edges to check, not only the edge created by the flip.
-            checkList.emplace_back(edgeFlip(e.e0, e.e1));
-            ++flipsCount;
-        }
-
+        auto edge = checkList.front();
         checkList.pop_front();
 
-        --justInCase;
+        if (!isEdgeDelaunay(edge))
+        {
+            // @todo There are more edges to check, not only the edge created by the flip.
+            Edge e = edgeFlip(edge.e0, edge.e1);
+
+            bool t0Inf = isFaceInfinite(e.t0);
+            bool t1Inf = isFaceInfinite(e.t1);
+
+            if (!t0Inf)
+            {
+                const auto& t0 = m_Faces.at(e.t0);
+                
+                glm::length_t ie00 = localVertexIndex(e.e0, e.t0);
+                glm::length_t ie10 = localVertexIndex(e.e1, e.t0);
+                
+                size_t it1p = t0.neighbours[ie10];
+                size_t it0p = t0.neighbours[ie00];
+
+                size_t iep = t0.indices[(ie00 + 1) % 3];
+
+                if (!isFaceInfinite(it1p))
+                    checkList.emplace_back(Edge{
+                        .e0 = e.e0,
+                        .e1 = iep,
+                        .t0 = it1p,
+                        .t1 = e.t0
+                    });
+
+                if (!isFaceInfinite(it0p))
+                    checkList.emplace_back(Edge{
+                        .e0 = iep,
+                        .e1 = e.e1,
+                        .t0 = it0p,
+                        .t1 = e.t0
+                    });
+            }
+
+            if (!t1Inf)
+            {
+                const auto& t1 = m_Faces.at(e.t1);
+
+                glm::length_t ie01 = localVertexIndex(e.e0, e.t1);
+                glm::length_t ie11 = localVertexIndex(e.e1, e.t1);
+
+                size_t it1pp = t1.neighbours[ie11];
+                size_t it0pp = t1.neighbours[ie01];
+                size_t iepp = t1.indices[(ie11  + 1) % 3];
+
+                if (!isFaceInfinite(it1pp))
+                    checkList.emplace_back(Edge{
+                        .e0 = e.e0,
+                        .e1 = iepp,
+                        .t0 = e.t1,
+                        .t1 = it1pp
+                    });
+
+                if (!isFaceInfinite(it0pp))
+                    checkList.emplace_back(Edge{
+                        .e0 = iepp,
+                        .e1 = e.e1,
+                        .t0 = e.t1,
+                        .t1 = it0pp
+                    });
+            }
+
+            if (!t0Inf && !t1Inf)
+                checkList.emplace_back(e);
+
+            ++flipsCount;
+        }
     }
 
     VRM_ASSERT_MSG(justInCase > 0, "Too many flips were made when adding a vertex to the triangulation while keeping Delaunay property.");
@@ -583,19 +640,16 @@ int TriangularMesh::delaunayAlgorithm()
             const auto& f_neighbour = m_Faces.at(i_neighbour);
 
             Edge e;
-            e.e0 = f.indices[(j + 2) % 3];
-            e.e1 = f.indices[(j + 1) % 3];
+            e.e0 = f.indices[(j + 1) % 3];
+            e.e1 = f.indices[(j + 2) % 3];
 
             if (edges.contains(e))
                 continue;
 
             std::swap(e.e0, e.e1);
 
-            if (edges.contains(e))
-                continue;
-
-            e.t0 = i_neighbour;
-            e.t1 = i;
+            e.t0 = i;
+            e.t1 = i_neighbour;
 
             edges.insert(e);
         }

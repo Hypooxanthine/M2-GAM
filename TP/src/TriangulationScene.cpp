@@ -20,7 +20,7 @@
 #include "ScopeProfiler.h"
 
 TriangulationScene::TriangulationScene()
-    : vrm::Scene(), m_Camera(0.1f, 100.f, glm::radians(90.f), 600.f / 400.f, { 0.f, 20.f, 0.f }, { glm::radians(90.f), 0.f, 0.f })
+    : vrm::Scene(), m_Camera(0.1f, 100'000.f, glm::radians(90.f), 600.f / 400.f, { 0.f, 20.f, 0.f }, { glm::radians(90.f), 0.f, 0.f })
 {
     auto& gameLayer = vrm::Application::Get().getGameLayer();
 
@@ -75,10 +75,10 @@ void TriangulationScene::onInit()
 
     auto lightEntity = createEntity("Light");
     auto& c =  lightEntity.addComponent<vrm::PointLightComponent>();
-    c.color = { 1.f, 1.f, 1.f };
-    c.intensity = 1000000.f;
-    c.radius = 2000.f;
-    lightEntity.getComponent<vrm::TransformComponent>().setPosition({ -5.f, 1000.f , -5.f });
+    c.color = glm::vec3(1.f);
+    c.radius = 100'000.f;
+    c.intensity = std::powf(c.radius, 1.5f);
+    lightEntity.getComponent<vrm::TransformComponent>().setPosition({ -5.f, 10'000.f , -5.f });
 
     resetTriangularMesh();
 }
@@ -123,7 +123,7 @@ void TriangulationScene::onImGui()
         ImGui::TextWrapped("Right click to interact with the scene.");
         ImGui::Checkbox("Enable controls", &m_ControlsEnabled);
         ImGui::TextWrapped("Camera speed");
-        ImGui::SliderFloat("##Camera speed", &myCameraSpeed, 0.f, 100.f);
+        ImGui::SliderFloat("##Camera speed", &myCameraSpeed, 0.f, 10000.f, "%.3f", ImGuiSliderFlags_Logarithmic);
         ImGui::TextWrapped("Camera angular speed");
         ImGui::SliderFloat("##Camera angular speed", &myCameraAngularSpeed, 0.f, 0.1f);
     ImGui::End();
@@ -141,12 +141,39 @@ void TriangulationScene::onImGui()
                 m_TriangulationModeLabel = "Naive";
                 m_TriangulationMode = TriangulationMode::NAIVE;
                 resetTriangularMesh();
+
+                m_Camera.setNear(0.1f);
+                m_Camera.setFar(100.f);
+                m_Camera.setWorldPosition({ 0.f, 20.f, 0.f });
+                m_Camera.setRotation({ glm::radians(90.f), 0.f, 0.f });
+                m_ControlsEnabled = false;
+                myCameraSpeed = 10.f;
             }
             if (ImGui::Selectable("Continuous Delaunay") && m_TriangulationMode != TriangulationMode::CONTINUOUS_DELAUNAY)
             {
                 m_TriangulationModeLabel = "Continuous Delaunay";
                 m_TriangulationMode = TriangulationMode::CONTINUOUS_DELAUNAY;
                 resetTriangularMesh();
+
+                m_Camera.setNear(0.1f);
+                m_Camera.setFar(100.f);
+                m_Camera.setWorldPosition({ 0.f, 20.f, 0.f });
+                m_Camera.setRotation({ glm::radians(90.f), 0.f, 0.f });
+                m_ControlsEnabled = false;
+                myCameraSpeed = 10.f;
+            }
+            if (ImGui::Selectable("Terrain") && m_TriangulationMode != TriangulationMode::TERRAIN)
+            {
+                m_TriangulationModeLabel = "Terrain";
+                m_TriangulationMode = TriangulationMode::TERRAIN;
+                resetTriangularMesh();
+
+                m_Camera.setNear(1'000.f);
+                m_Camera.setFar(20'000.f);
+                m_Camera.setWorldPosition({ 0.f, 10'000.f, 0.f });
+                m_Camera.setRotation({ glm::radians(90.f), 0.f, 0.f });
+                m_ControlsEnabled = true;
+                myCameraSpeed = 5'000.f;
             }
 
             ImGui::EndCombo();
@@ -183,6 +210,40 @@ void TriangulationScene::onImGui()
             updateTriangularMesh();
         }
 
+        if (m_TriangulationMode == TriangulationMode::TERRAIN)
+        {
+            if (ImGui::BeginCombo("Terrain data", m_TerrainDataLabel.c_str()))
+            {
+                for (const auto& file : std::filesystem::directory_iterator(std::filesystem::current_path() / "Resources" / "TerrainData"))
+                {
+                    if (file.is_directory())
+                        continue;
+
+                    std::string fileName = file.path().filename().string();
+                    if (ImGui::Selectable(fileName.c_str()))
+                    {
+                        m_TerrainDataLabel = fileName;
+                        m_TerrainDataPath = file.path();
+                    }
+                }
+
+                ImGui::EndCombo();
+            }
+
+            if (!m_TerrainDataLabel.empty())
+            {
+                if (ImGui::Button("Naive triangulation"))
+                {
+                    naiveTriangulation(m_TerrainDataPath);
+                }
+
+                if (ImGui::Button("Delaunay triangulation"))
+                {
+                    delaunayTriangulation(m_TerrainDataPath);
+                }
+            }
+        }
+
         if (ImGui::Button("Integrity test"))
             m_TriangularMesh.integrityTest();
 
@@ -196,6 +257,8 @@ void TriangulationScene::onImGui()
             ImGui::TextWrapped("Last process time: %.6f s", m_LastProcessTime);
         if (m_LastFlipsCount >= 0)
             ImGui::TextWrapped("Last flips count: %d", m_LastFlipsCount);
+        ImGui::TextWrapped("Camera position: %s", glm::to_string(m_Camera.getPosition()).c_str());
+        ImGui::TextWrapped("Camera rotation: %s", glm::to_string(m_Camera.getRotation()).c_str());
     ImGui::End();
 }
 
@@ -239,6 +302,130 @@ void TriangulationScene::onRightClick(int mouseX, int mouseY)
         updateTriangularMesh();
     }
 
+}
+
+void TriangulationScene::naiveTriangulation(const std::filesystem::path& data)
+{
+    std::ifstream ifs(data);
+    VRM_ASSERT_MSG(ifs.is_open(), "Couldn't open file {}.", data.string());
+
+    {
+        PROFILE_SCOPE_VARIABLE(m_LastProcessTime);
+        auto vertexCount = setupTriangulation(ifs);
+
+        std::string line;
+        while (std::getline(ifs, line))
+        {
+            std::stringstream sstream(line);
+            glm::vec3 v;
+            std::string token;
+
+            sstream >> token;
+            v.x = std::stof(token);
+            sstream >> token;
+            v.z = std::stof(token);
+            v.y = 0.f;
+
+            m_TriangularMesh.addVertex_StreamingTriangulation(v);
+        }
+    }
+
+    fixHeights(ifs);
+
+    updateTriangularMesh();
+}
+
+void TriangulationScene::delaunayTriangulation(const std::filesystem::path& data)
+{
+    std::ifstream ifs(data);
+    VRM_ASSERT_MSG(ifs.is_open(), "Couldn't open file {}.", data.string());
+
+    {
+        PROFILE_SCOPE_VARIABLE(m_LastProcessTime);
+        auto vertexCount = setupTriangulation(ifs);
+
+        std::string line;
+        while (std::getline(ifs, line))
+        {
+            std::stringstream sstream(line);
+            glm::vec3 v;
+            std::string token;
+
+            sstream >> token;
+            v.x = std::stof(token);
+            sstream >> token;
+            v.z = std::stof(token);
+            v.y = 0.f;
+
+            m_TriangularMesh.addVertex_StreamingDelaunayTriangulation(v);
+        }
+    }
+
+    fixHeights(ifs);
+
+    updateTriangularMesh();
+}
+
+unsigned long long TriangulationScene::setupTriangulation(std::ifstream& ifs)
+{
+    m_TriangularMesh.clear();
+
+    std::string line;
+
+    std::getline(ifs, line);
+    auto vertexCount = std::stoull(line);
+
+    std::array<size_t, 3> vertexIndices;
+    std::array<glm::vec2, 3> vertices;
+    TriangularMesh::Vertex v;
+
+    for (uint8_t i = 0; i < 3; ++i)
+    {
+        std::getline(ifs, line);
+        std::stringstream sstream(line);
+
+        std::string token;
+
+        sstream >> token;
+        v.position.x = std::stof(token);
+        sstream >> token;
+        v.position.z = std::stof(token);
+        v.position.y = 0.f;
+
+        vertices[i] = glm::vec2(v.position.x, -v.position.z);
+        vertexIndices[i] = m_TriangularMesh.addVertex(v);
+    }
+
+    if (glm::determinant(glm::mat2(vertices[1] - vertices[0], vertices[2] - vertices[0])) > 0.f)
+        m_TriangularMesh.addFirstFaceForTriangulation(vertexIndices[0], vertexIndices[1], vertexIndices[2]);
+    else
+        m_TriangularMesh.addFirstFaceForTriangulation(vertexIndices[0], vertexIndices[2], vertexIndices[1]);
+
+    return vertexCount;
+}
+
+void TriangulationScene::fixHeights(std::ifstream& ifs)
+{
+    ifs.clear();
+    ifs.seekg(0);
+
+    std::string line;
+    std::getline(ifs, line);
+
+    for (size_t i = 0; std::getline(ifs, line); ++i)
+    {
+        std::stringstream sstream(line);
+        std::string token;
+
+        sstream >> token;
+        sstream >> token;
+        sstream >> token;
+
+        size_t index = i;
+        if (i > 2) index = index + 1; // Because of infinite vertex
+
+        m_TriangularMesh.getVertex(index).position.y = std::stof(token);
+    }
 }
 
 void TriangulationScene::resetTriangularMesh()
