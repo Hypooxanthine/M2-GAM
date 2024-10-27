@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <unordered_set>
 
 #include <Vroom/Core/Assert.h>
 
@@ -529,6 +530,7 @@ int TriangularMesh::delaunayAlgorithm(std::deque<Edge>& checkList)
 
         if (!isEdgeDelaunay(e))
         {
+            // @todo There are more edges to check, not only the edge created by the flip.
             checkList.emplace_back(edgeFlip(e.e0, e.e1));
             ++flipsCount;
         }
@@ -543,9 +545,65 @@ int TriangularMesh::delaunayAlgorithm(std::deque<Edge>& checkList)
     return flipsCount;
 }
 
+template<>
+struct std::hash<TriangularMesh::Edge>
+{
+    std::size_t operator()(const TriangularMesh::Edge& e) const noexcept
+    {
+        auto hasher = std::hash<size_t>();
+        auto seed = hasher(e.e0);
+        hash_combine(seed, e.e1);
+        return seed;
+    }
+};
+
+bool operator==(const TriangularMesh::Edge& left, const TriangularMesh::Edge& right)
+{
+    return left.e0 == right.e0 && left.e1 == right.e1;
+}
+
 int TriangularMesh::delaunayAlgorithm()
 {
-    return -1;
+    std::unordered_set<Edge> edges;
+
+    for (size_t i = 0; i < m_Faces.size(); i++)
+    {
+        if (isFaceInfinite(i))
+            continue;
+        
+        const auto& f = m_Faces.at(i);
+
+        for (glm::length_t j = 0; j < 3; j++)
+        {
+            auto i_neighbour = f.neighbours[j];
+
+            if (isFaceInfinite(i_neighbour))
+                continue;
+
+            const auto& f_neighbour = m_Faces.at(i_neighbour);
+
+            Edge e;
+            e.e0 = f.indices[(j + 2) % 3];
+            e.e1 = f.indices[(j + 1) % 3];
+
+            if (edges.contains(e))
+                continue;
+
+            std::swap(e.e0, e.e1);
+
+            if (edges.contains(e))
+                continue;
+
+            e.t0 = i_neighbour;
+            e.t1 = i;
+
+            edges.insert(e);
+        }
+    }
+
+    std::deque<Edge> checkList(edges.begin(), edges.end());
+
+    return delaunayAlgorithm(checkList);
 }
 
 size_t TriangularMesh::getVertexCount() const

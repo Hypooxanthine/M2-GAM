@@ -174,19 +174,14 @@ void TriangulationScene::onImGui()
         // In naive mode, we let the possibility of transforming the triangulation into a Delaunay
         // triangulation. We do not do it in continuous Delaunay because the mesh
         // is suppose to stay Delaunay while adding vertices.
-        ImGui::BeginDisabled();
-            if (m_TriangulationMode == TriangulationMode::NAIVE && ImGui::Button("Delaunay algorithm"))
+        if (m_TriangulationMode == TriangulationMode::NAIVE && ImGui::Button("Delaunay algorithm"))
+        {
             {
-                m_TriangularMesh.delaunayAlgorithm();
-                updateTriangularMesh();
+                PROFILE_SCOPE_VARIABLE(m_LastProcessTime);
+                m_LastFlipsCount = m_TriangularMesh.delaunayAlgorithm();
             }
-
-            if (ImGui::BeginItemTooltip())
-            {
-                ImGui::Text("Delaunay algorithm on whole mesh is not implemented yet.");
-                ImGui::EndTooltip();
-            }
-        ImGui::EndDisabled();
+            updateTriangularMesh();
+        }
 
         if (ImGui::Button("Integrity test"))
             m_TriangularMesh.integrityTest();
