@@ -5,12 +5,14 @@
 Implementation of Laplacian operator for curvature and heat computation on a 3D mesh.
 Implementation of Delaunay triangulation in 2D (WIP).
 
+## Demo video (only for triangulation)
+
+https://www.youtube.com/watch?v=MFvUw8UzE4Y
+
 ## Screenshots
 
 ![Curvature](Screenshots/LaplacianCurvatureRender.png)
 ![Heat diffusion](Screenshots/HeatDiffusion.png)
-
-[![Triangulation demo](https://img.youtube.com/vi/MFvUw8UzE4Y/0.jpg)](https://www.youtube.com/watch?v=MFvUw8UzE4Y)
 
 ## Building project
 
