@@ -10,6 +10,8 @@ Implementation of Delaunay triangulation in 2D (WIP).
 ![Curvature](Screenshots/LaplacianCurvatureRender.png)
 ![Heat diffusion](Screenshots/HeatDiffusion.png)
 
+[![Triangulation demo](https://img.youtube.com/vi/MFvUw8UzE4Y/0.jpg)](https://www.youtube.com/watch?v=MFvUw8UzE4Y)
+
 ## Building project
 
 ### Windows
